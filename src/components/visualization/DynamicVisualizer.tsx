@@ -13,6 +13,7 @@ import {
   type RegisterName,
   type RegisterState,
 } from '../../arm64/registers';
+import type { LessonVisualFocus } from '../../learning/types';
 import '../../visualizations.css';
 
 type ChangeCollection<T> = readonly T[] | ReadonlySet<T>;
@@ -32,6 +33,9 @@ export interface DynamicVisualizerProps {
   transition: VisualizationTransition;
   describeAddress?: (address: bigint, register?: RegisterName) => string | null | undefined;
   compact?: boolean;
+  focus?: readonly LessonVisualFocus[];
+  flagFocus?: readonly FlagName[];
+  registerFocus?: readonly RegisterName[];
 }
 
 interface FlowNode {
@@ -334,11 +338,55 @@ function transitionTitle(transition: VisualizationTransition): string {
   return transition.instruction?.sourceText ?? 'CPU state updated';
 }
 
-function flagSummary(flags: CPUFlags): string {
-  return FLAG_NAMES.map((name) => `${name}=${flags[name] ? '1' : '0'}`).join('  ');
+function flagSummary(flags: CPUFlags, names: readonly FlagName[]): string {
+  return names.map((name) => `${name}=${flags[name] ? '1' : '0'}`).join('  ');
 }
 
-export function DynamicVisualizer({ transition, describeAddress, compact = false }: DynamicVisualizerProps) {
+function phaseAction(transition: VisualizationTransition): string {
+  if (transition.direction === 'reset') return 'Press Step';
+  if (transition.direction === 'back') return 'Restore previous snapshot';
+  if (transition.direction === 'run') return 'Run program';
+  return transition.instruction?.sourceText ?? 'Update CPU state';
+}
+
+function WatchedRegisters({
+  snapshot,
+  registers,
+  comparison,
+}: {
+  snapshot: CPUSnapshot;
+  registers: readonly RegisterName[];
+  comparison?: CPUSnapshot;
+}) {
+  return (
+    <div className="dv-phase-registers">
+      {registers.map((name) => {
+        const changed = comparison !== undefined
+          && snapshot.registers[name] !== comparison.registers[name];
+        return (
+          <div
+            className={`dv-phase-register ${changed ? 'dv-phase-register-changed' : ''}`}
+            data-register={name}
+            key={name}
+          >
+            <strong>{registerLabel(name)}</strong>
+            <code>{formatHex(snapshot.registers[name])}</code>
+            {comparison && !changed && <small>unchanged</small>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DynamicVisualizer({
+  transition,
+  describeAddress,
+  compact = false,
+  focus,
+  flagFocus,
+  registerFocus,
+}: DynamicVisualizerProps) {
   const { before, after, instruction, direction } = transition;
   const explicitMemoryChanges = asSet(transition.changedMemory);
   const registerChanges = changedRegisterNames(transition);
@@ -355,13 +403,23 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
     ? buildDataFlow(instruction, executionInput, executionOutput)
     : null;
   const stackRows = stackAddresses(before.registers.sp, after.registers.sp, compact);
-  const pointers = pointerViews(after, new Set(registerChanges), describeAddress, compact ? 1 : 2);
+  const registerChangeSet = new Set(registerChanges);
+  const watchedRegisters = registerFocus
+    ? [...new Set(registerFocus)].slice(0, compact ? 4 : 8)
+    : [];
+  const hasRegisterScope = watchedRegisters.length > 0;
+  const scopedRegisterChanges = hasRegisterScope
+    ? watchedRegisters.filter((name) => registerChangeSet.has(name))
+    : registerChanges;
+  const pointers = pointerViews(after, registerChangeSet, describeAddress, compact ? 1 : 2)
+    .filter((pointer) => !hasRegisterScope || watchedRegisters.includes(pointer.register));
   const spMoved = before.registers.sp !== after.registers.sp;
   const callStackChanged = before.callStack.length !== after.callStack.length;
   const isCallInstruction = hasAdjacentInstructionStates
     && (instruction?.opcode === 'bl' || instruction?.opcode === 'blr');
   const isReturnInstruction = hasAdjacentInstructionStates && instruction?.opcode === 'ret';
   const showCalls = isCallInstruction || isReturnInstruction || callStackChanged;
+  const showInitialCalls = direction === 'reset' && (focus?.includes('calls') ?? false);
   const isConditionalBranch = hasAdjacentInstructionStates && (instruction?.opcode.startsWith('b.') ?? false);
   const isComparison = hasAdjacentInstructionStates
     && (instruction?.opcode === 'cmp' || instruction?.opcode === 'tst');
@@ -376,7 +434,14 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
     instruction?.sourceLine ?? 0,
     [...explicitMemoryChanges].map((address) => address.toString(16)).join(','),
   ].join(':');
-  const visibleRegisterChanges = registerChanges.slice(0, compact ? 4 : 8);
+  const visibleRegisterChanges = scopedRegisterChanges.slice(0, compact ? 4 : 8);
+  const shows = (area: LessonVisualFocus): boolean => !focus || focus.includes(area);
+  const showRegisterChanges = hasRegisterScope || shows('registers');
+  const stackOperand = instruction?.operands.find((operand) => operand.kind === 'memory');
+  const showStackDataFlow = shows('stack') && stackOperand?.kind === 'memory' && stackOperand.base === 'sp';
+  const showDataFlow = shows('registers') || shows('memory') || shows('pointers') || showStackDataFlow;
+  const visibleFlags = flagFocus ?? FLAG_NAMES;
+  const phaseBefore = direction === 'reset' ? after : before;
 
   return (
     <section
@@ -398,7 +463,34 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
         {spMoved ? ` Stack pointer is now ${formatHex(after.registers.sp)}.` : ''}
       </p>
 
-      {visibleRegisterChanges.length > 0 && (
+      {showRegisterChanges && hasRegisterScope && (
+        <section className="dv-card dv-phase-timeline" aria-label="Before, execute, and after register state" data-testid="dynamic-context">
+          <div className="dv-section-heading">
+            <h3>{direction !== 'reset' && visibleRegisterChanges.length > 0 ? 'Register changes' : 'Registers to watch'}</h3>
+            <span>{visibleRegisterChanges.length > 0 ? `${visibleRegisterChanges.length} changed` : 'focused state only'}</span>
+          </div>
+          <div className="dv-phase-track">
+            <div className="dv-phase dv-phase-before" data-testid="visual-phase-before">
+              <span>Before</span>
+              <WatchedRegisters snapshot={phaseBefore} registers={watchedRegisters} />
+            </div>
+            <span className="dv-phase-arrow" aria-hidden="true">→</span>
+            <div className="dv-phase dv-phase-execute" data-testid="visual-phase-execute">
+              <span>Execute</span>
+              <code>{phaseAction(transition)}</code>
+            </div>
+            <span className="dv-phase-arrow" aria-hidden="true">→</span>
+            <div className="dv-phase dv-phase-after" data-testid="visual-phase-after">
+              <span>After</span>
+              {direction === 'reset'
+                ? <p>Waiting for the first Step.</p>
+                : <WatchedRegisters snapshot={after} registers={watchedRegisters} comparison={before} />}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {showRegisterChanges && !hasRegisterScope && visibleRegisterChanges.length > 0 && (
         <section className="dv-card dv-register-changes" aria-labelledby={`dv-register-title-${animationKey}`}>
           <div className="dv-section-heading">
             <h3 id={`dv-register-title-${animationKey}`}>Register changes</h3>
@@ -419,7 +511,7 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
         </section>
       )}
 
-      {dataFlow && (
+      {showDataFlow && dataFlow && (
         <section className="dv-card dv-data-flow" aria-label={`${dataFlow.operation} data flow`}>
           <h3>Data flow</h3>
           <div className="dv-flow-track">
@@ -449,7 +541,7 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
         </section>
       )}
 
-      <section className="dv-card dv-stack" aria-labelledby={`dv-stack-title-${animationKey}`} data-testid="dynamic-stack">
+      {shows('stack') && <section className="dv-card dv-stack" aria-labelledby={`dv-stack-title-${animationKey}`} data-testid="dynamic-stack">
         <div className="dv-section-heading">
           <div>
             <h3 id={`dv-stack-title-${animationKey}`}>Stack</h3>
@@ -491,9 +583,9 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
           })}
         </div>
         <div className="dv-stack-direction">Lower addresses <b aria-hidden="true">↓</b></div>
-      </section>
+      </section>}
 
-      {pointers.length > 0 && (
+      {shows('pointers') && pointers.length > 0 && (
         <section className="dv-card dv-pointers" aria-label="Live pointers" data-testid="dynamic-pointers">
           <h3>Pointers</h3>
           <div className="dv-pointer-list">
@@ -518,7 +610,12 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
         </section>
       )}
 
-      {(isComparison || isConditionalBranch || flagChanges.length > 0) && (
+      {shows('flags') && (
+        isComparison
+        || isConditionalBranch
+        || flagChanges.length > 0
+        || (direction === 'reset' && (focus?.includes('flags') ?? false))
+      ) && (
         <section className="dv-card dv-control-flow" aria-label="Flags and branch visualization" data-testid="dynamic-branch">
           <h3>{isConditionalBranch ? 'Branch decision' : 'Flags'}</h3>
           {isComparison && instruction && (
@@ -528,8 +625,8 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
               <div><span>{operandLabel(instruction.operands[1])}</span><code>{valueLabel(instruction.operands[1], executionInput.registers)}</code></div>
             </div>
           )}
-          <div className="dv-flags" aria-label={`NZCV flags: ${flagSummary(after.flags)}`}>
-            {FLAG_NAMES.map((name) => (
+          <div className="dv-flags" aria-label={`Condition flags: ${flagSummary(after.flags, visibleFlags)}`}>
+            {visibleFlags.map((name) => (
               <div className={`${after.flags[name] ? 'dv-flag-set' : ''} ${flagChanges.includes(name) ? 'dv-flag-changed' : ''}`} key={name}>
                 <strong>{name}</strong><span>{after.flags[name] ? '1' : '0'}</span>
               </div>
@@ -551,7 +648,7 @@ export function DynamicVisualizer({ transition, describeAddress, compact = false
         </section>
       )}
 
-      {showCalls && (
+      {shows('calls') && (showCalls || showInitialCalls) && (
         <section className="dv-card dv-calls" aria-label="Function call visualization" data-testid="dynamic-calls">
           <div className="dv-section-heading">
             <h3>Function calls</h3>

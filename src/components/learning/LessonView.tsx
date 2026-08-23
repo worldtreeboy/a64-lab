@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdjacentLessons } from '../../learning/lessons';
 import { useProgress } from '../../learning/progress';
@@ -7,16 +7,37 @@ import { AssemblyExample, TryInLabButton } from './AssemblyExample';
 import { ConceptDiagram } from './ConceptDiagram';
 import { LiveLessonDemo } from './LiveLessonDemo';
 import { PredictionQuestion } from './PredictionQuestion';
+import { StateWalkthrough } from './StateWalkthrough';
+
+const CONCEPT_ACRONYMS = new Set([
+  'abi', 'arm64', 'bl', 'blr', 'br', 'cmp', 'cpu', 'fp', 'ldp', 'ldr', 'lr', 'nzcv', 'pc',
+  'ret', 'sp', 'stp', 'str', 'svc', 'w', 'x',
+]);
+
+function conceptLabel(value: string): string {
+  return value
+    .split('-')
+    .map((word) => CONCEPT_ACRONYMS.has(word) ? word.toUpperCase() : word)
+    .join(' ');
+}
 
 export function LessonView({ lesson }: { lesson: Lesson }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const { progress, markLessonComplete } = useProgress();
+  const [celebrationId, setCelebrationId] = useState(0);
+  const { progress, markLessonComplete, unmarkLessonComplete } = useProgress();
   const complete = progress.completedLessons.includes(lesson.id);
   const { previous, next } = getAdjacentLessons(lesson.id);
 
   useEffect(() => {
     titleRef.current?.focus();
+    setCelebrationId(0);
   }, [lesson.id]);
+
+  useEffect(() => {
+    if (celebrationId === 0) return undefined;
+    const timeout = window.setTimeout(() => setCelebrationId(0), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [celebrationId]);
 
   return (
     <article className="lesson-view">
@@ -28,6 +49,24 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         </div>
         <span className="lesson-duration">{lesson.estimatedMinutes} min</span>
       </header>
+
+      <section className={`lesson-mental-model lesson-mental-model-${lesson.kind}`} aria-labelledby={`core-idea-${lesson.id}`}>
+        <span className="eyebrow">
+          {lesson.kind === 'integration' ? 'PUTTING FAMILIAR IDEAS TOGETHER' : 'ONE NEW MENTAL MODEL'}
+        </span>
+        <h3 id={`core-idea-${lesson.id}`}>{lesson.coreIdea}</h3>
+        <div className="lesson-concept-context">
+          {lesson.buildsOn.length > 0 && (
+            <p><strong>You already know</strong><span>{lesson.buildsOn.map(conceptLabel).join(' · ')}</span></p>
+          )}
+          {lesson.newConcepts.length > 0 && (
+            <p>
+              <strong>{lesson.kind === 'integration' ? 'You will connect' : 'New today'}</strong>
+              <span>{lesson.newConcepts.map(conceptLabel).join(' · ')}</span>
+            </p>
+          )}
+        </div>
+      </section>
 
       {lesson.sections.map((section) => (
         <section className="lesson-section" id={section.id} key={section.id}>
@@ -43,11 +82,12 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
             <AssemblyExample
               code={section.code}
               title={section.codeLabel}
-              labProgram={lesson.labProgram}
+              labProgram={section.code === lesson.labProgram ? section.code : undefined}
               lessonId={lesson.id}
               lessonTitle={lesson.title}
             />
           )}
+          {section.walkthrough && <StateWalkthrough walkthrough={section.walkthrough} />}
           {section.callout && <div className="lesson-callout">{section.callout}</div>}
         </section>
       ))}
@@ -57,6 +97,10 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
           key={lesson.id}
           program={lesson.labProgram}
           title={lesson.title}
+          focus={lesson.visualFocus}
+          flagFocus={lesson.flagFocus}
+          registerFocus={lesson.registerFocus}
+          visualPrompt={lesson.visualPrompt}
         />
       )}
 
@@ -90,15 +134,42 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
             />
           )}
           <button
-            className="button button-primary"
+            className={`button ${complete ? 'button-secondary completion-toggle-complete' : 'button-primary'}`}
             type="button"
-            disabled={complete}
-            onClick={() => markLessonComplete(lesson.id)}
+            aria-pressed={complete}
+            onClick={() => {
+              if (complete) {
+                unmarkLessonComplete(lesson.id);
+                return;
+              }
+              markLessonComplete(lesson.id);
+              setCelebrationId((current) => current + 1);
+            }}
           >
-            {complete ? '✓ Completed' : 'Mark Complete'}
+            {complete ? 'Unmark Complete' : 'Mark Complete'}
           </button>
         </div>
       </section>
+
+      {celebrationId > 0 && (
+        <div className="lesson-celebration" role="status" aria-live="polite" key={celebrationId}>
+          <div className="celebration-particles" aria-hidden="true">
+            {Array.from({ length: 14 }, (_, index) => <span key={index} />)}
+          </div>
+          <div className="celebration-card">
+            <span className="celebration-check" aria-hidden="true">✓</span>
+            <div>
+              <strong>Lesson complete!</strong>
+              <span>Nice work. That concept is now part of your ARM64 toolkit.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <aside className="lesson-transition" aria-label="What comes next">
+        <span className="eyebrow">CONNECT THE IDEAS</span>
+        <p>{lesson.nextStep}</p>
+      </aside>
 
       <nav className="lesson-navigation" aria-label="Lesson navigation">
         {previous

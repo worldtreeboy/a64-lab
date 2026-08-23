@@ -20,7 +20,7 @@ real simulated CPU state change.
 
 | Route | Purpose |
 | --- | --- |
-| `/guide` | 18 short lessons from the ARM64 mental model to native-code patterns |
+| `/guide` | 36 focused lessons from the ARM64 mental model to native-code patterns |
 | `/lab` | The full debugger-style simulator |
 | `/challenges` | Prediction and code exercises checked by the real simulator engine |
 
@@ -45,29 +45,24 @@ try the program in the full Lab
 check the idea and mark the lesson complete
 ```
 
-The 18 modules cover:
+The 36-lesson path deliberately separates concepts that are often taught all
+at once:
 
-1. Meet ARM64
-2. Registers
-3. MOV and arithmetic
-4. Addresses and pointers
-5. Memory with LDR and STR
-6. Little endian
-7. The stack
-8. STP/LDP and stack frames
-9. CMP and NZCV
-10. Branches
-11. Function calls, BL, LR, and RET
-12. Nested function calls
-13. Data sections and strings
-14. Linux AArch64 syscalls
-15. Reading disassembly
-16. C to ARM64
-17. Debugging ARM64 state
-18. Common native-code patterns, BR, and BLR
+| Lessons | Focus |
+| --- | --- |
+| 1–4 | foundations: CPU state, X registers, X/W width, and arithmetic |
+| 5–11 | memory and stack: pointers, separate stores/loads, offsets, endianness, and SP |
+| 12–16 | decisions: CMP/Z, unconditional flow, equality, then signed conditions |
+| 17–26 | functions and frames: BL/LR, RET, arguments, results, saved LR, and frames |
+| 27–31 | data and Linux: sections, string bytes, label addresses, SVC, and write |
+| 32–36 | reading native code: disassembly, C mappings, debugging, and indirect flow |
 
-Lessons are deliberately concise—usually 5–15 focused minutes—and introduce
-terms before using them.
+Lessons are deliberately concise—usually 5–15 focused minutes—and teach the
+expanded mental model before compact syntax. Each concept lesson introduces no
+more than two genuinely new ideas, shows a focused Before → Execute → After
+view, and ends with a bridge to the next idea. Completion can be marked or
+unmarked at any time, is saved locally, and gives a short reduced-motion-aware
+celebration.
 
 ## Live visual learning
 

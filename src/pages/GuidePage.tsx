@@ -4,6 +4,7 @@ import { SiteHeader } from '../components/SiteHeader';
 import { GuideSidebar } from '../components/learning/GuideSidebar';
 import { LessonView } from '../components/learning/LessonView';
 import { ProgressBar } from '../components/learning/ProgressBar';
+import { CURRICULUM_STAGES, lessonsForStage } from '../learning/curriculum';
 import { getLesson, LESSONS } from '../learning/lessons';
 import { percentComplete, useProgress } from '../learning/progress';
 import type { AppTheme } from '../theme';
@@ -74,7 +75,7 @@ export function GuidePage({ theme, onThemeChange }: GuidePageProps) {
               </div>
 
               <div className="dashboard-heading">
-                <div><span className="eyebrow">CURRICULUM</span><h3>18 focused modules</h3></div>
+                <div><span className="eyebrow">CURRICULUM</span><h3>{LESSONS.length} focused lessons</h3></div>
                 <button
                   className="reset-progress"
                   type="button"
@@ -85,23 +86,39 @@ export function GuidePage({ theme, onThemeChange }: GuidePageProps) {
                   Reset Progress
                 </button>
               </div>
-              <div className="module-grid">
-                {LESSONS.map((item) => (
-                  <Link className={`module-card ${completed.has(item.id) ? 'complete' : ''}`} to={`/guide/${item.id}`} key={item.id}>
-                    <span>{completed.has(item.id) ? '✓' : item.order.toString().padStart(2, '0')}</span>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.description}</p>
+              <div className="dashboard-stages">
+                {CURRICULUM_STAGES.map((stage) => (
+                  <section className="dashboard-stage" aria-labelledby={`dashboard-stage-${stage.id}`} key={stage.id}>
+                    <header>
+                      <div>
+                        <span className="eyebrow">LESSONS {stage.firstLesson}–{stage.lastLesson}</span>
+                        <h4 id={`dashboard-stage-${stage.id}`}>{stage.title}</h4>
+                      </div>
+                      <p>{stage.description}</p>
+                    </header>
+                    <div className="module-grid">
+                      {lessonsForStage(stage).map((item) => (
+                        <Link className={`module-card ${completed.has(item.id) ? 'complete' : ''}`} to={`/guide/${item.id}`} key={item.id}>
+                          <span>{completed.has(item.id) ? '✓' : item.order.toString().padStart(2, '0')}</span>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <p>{item.description}</p>
+                          </div>
+                          <small>{item.estimatedMinutes} min</small>
+                        </Link>
+                      ))}
                     </div>
-                    <small>{item.estimatedMinutes} min</small>
-                  </Link>
+                  </section>
                 ))}
               </div>
             </section>
           )}
         </main>
         <aside className="guide-reference">
-          <CheatSheet />
+          <details className="guide-reference-details">
+            <summary>ARM64 Quick Reference</summary>
+            <CheatSheet />
+          </details>
         </aside>
       </div>
     </div>

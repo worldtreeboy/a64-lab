@@ -1,3 +1,5 @@
+import type { RegisterName } from '../arm64/registers';
+
 export interface QuizOption {
   id: string;
   label: string;
@@ -14,23 +16,54 @@ export interface QuizQuestion {
 
 export type DiagramKind =
   | 'mental-model'
+  | 'general-registers'
   | 'register-map'
   | 'arithmetic'
+  | 'address-number'
   | 'pointer'
+  | 'memory-store'
+  | 'memory-load'
   | 'load-store'
   | 'little-endian'
   | 'stack-growth'
+  | 'register-pair'
   | 'stack-frame'
+  | 'frame-pointer'
+  | 'zero-flag'
   | 'flags'
   | 'control-flow'
+  | 'unconditional-branch'
   | 'function-call'
+  | 'lr-overwrite'
   | 'nested-calls'
+  | 'indexed-addressing'
   | 'data-bytes'
+  | 'code-sections'
   | 'syscall'
+  | 'syscall-gate'
   | 'disassembly'
   | 'c-mapping'
   | 'debug-state'
   | 'indirect-call';
+
+export type LessonVisualFocus =
+  | 'registers'
+  | 'pointers'
+  | 'memory'
+  | 'stack'
+  | 'flags'
+  | 'calls'
+  | 'terminal';
+
+export type LessonFlagFocus = 'N' | 'Z' | 'C' | 'V';
+
+export type LessonKind = 'concept' | 'integration';
+
+export interface StateWalkthroughContent {
+  before: readonly string[];
+  execute: string;
+  after: readonly string[];
+}
 
 export interface LessonSection {
   id: string;
@@ -41,6 +74,7 @@ export interface LessonSection {
   codeLabel?: string;
   callout?: string;
   diagram?: DiagramKind;
+  walkthrough?: StateWalkthroughContent;
 }
 
 export interface Lesson {
@@ -50,10 +84,19 @@ export interface Lesson {
   shortTitle: string;
   description: string;
   estimatedMinutes: number;
-  prerequisites?: string[];
+  kind: LessonKind;
+  coreIdea: string;
+  newConcepts: readonly string[];
+  buildsOn: readonly string[];
+  prerequisites?: readonly string[];
   sections: LessonSection[];
   quiz: QuizQuestion[];
   labProgram?: string;
+  nextStep: string;
+  visualFocus: readonly LessonVisualFocus[];
+  registerFocus: readonly RegisterName[];
+  flagFocus?: readonly LessonFlagFocus[];
+  visualPrompt: string;
 }
 
 export type ChallengeCategory =

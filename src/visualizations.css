@@ -30,7 +30,7 @@
 
 .dv-eyebrow {
   color: var(--cyan, #4bd5e7);
-  font: 700 9px/1.2 var(--mono, monospace);
+  font: 700 10px/1.2 var(--mono, monospace);
   letter-spacing: 0.13em;
 }
 
@@ -76,12 +76,117 @@
 .dv-section-heading span,
 .dv-stack-direction {
   color: var(--muted, #7f8da3);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-register-changes,
+.dv-phase-timeline,
 .dv-stack {
   grid-column: 1 / -1;
+}
+
+.dv-phase-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px minmax(135px, 0.78fr) 26px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+}
+
+.dv-phase {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line-bright, #2b384b);
+  border-radius: 7px;
+  background: var(--surface, #0e131c);
+}
+
+.dv-phase > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cyan, #4bd5e7);
+  font: 750 10px/1.2 var(--mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dv-phase-registers {
+  display: grid;
+  gap: 5px;
+}
+
+.dv-phase-register {
+  display: grid;
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+
+.dv-phase-register strong {
+  color: var(--muted, #7f8da3);
+  font-size: 10px;
+}
+
+.dv-phase-register code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text, #dce5f2);
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
+.dv-phase-register small {
+  grid-column: 2;
+  color: var(--muted, #7f8da3);
+  font-size: 10px;
+}
+
+.dv-phase-register-changed {
+  border-color: color-mix(in srgb, var(--green, #57dfa0) 34%, transparent);
+  background: color-mix(in srgb, var(--green, #57dfa0) 8%, transparent);
+  animation: dv-result-arrive var(--dv-duration) ease-out;
+}
+
+.dv-phase-register-changed strong,
+.dv-phase-register-changed code {
+  color: var(--green, #57dfa0);
+}
+
+.dv-phase-execute {
+  display: grid;
+  align-content: center;
+  border-color: color-mix(in srgb, var(--cyan, #4bd5e7) 35%, transparent);
+  background: var(--cyan-dim, rgba(75, 213, 231, 0.1));
+  text-align: center;
+}
+
+.dv-phase-execute code,
+.dv-phase-after > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text, #dce5f2);
+  font: 700 10px/1.55 var(--mono, monospace);
+  white-space: pre-wrap;
+}
+
+.dv-phase-after {
+  border-color: color-mix(in srgb, var(--green, #57dfa0) 28%, transparent);
+}
+
+.dv-phase-after > p {
+  color: var(--muted, #7f8da3);
+  font-weight: 500;
+}
+
+.dv-phase-arrow {
+  align-self: center;
+  color: var(--cyan, #4bd5e7);
+  font: 750 16px var(--mono, monospace);
+  text-align: center;
+  animation: dv-arrow-travel var(--dv-duration) ease-out;
 }
 
 .dv-register-grid {
@@ -109,7 +214,7 @@
 
 .dv-register-change code {
   overflow: hidden;
-  font-size: 9px;
+  font-size: 10px;
   text-overflow: ellipsis;
 }
 
@@ -221,7 +326,7 @@
 }
 
 .dv-sp-motion code {
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-sp-motion em {
@@ -229,7 +334,7 @@
   border-radius: 4px;
   color: var(--amber, #f2c36b);
   background: color-mix(in srgb, var(--amber, #f2c36b) 10%, transparent);
-  font: normal 8px var(--mono, monospace);
+  font: normal 10px var(--mono, monospace);
 }
 
 .dv-stack-list {
@@ -250,7 +355,7 @@
 .dv-stack-address {
   padding-left: 8px;
   color: var(--muted, #7f8da3);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-stack-cell {
@@ -268,7 +373,7 @@
 }
 
 .dv-stack-cell code {
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-memory-before {
@@ -286,7 +391,7 @@
 .dv-stack-markers span {
   padding: 3px 5px;
   border-radius: 4px;
-  font: 700 8px var(--mono, monospace);
+  font: 700 10px var(--mono, monospace);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -354,7 +459,7 @@
 .dv-pointer-target code {
   overflow: hidden;
   color: var(--muted, #7f8da3);
-  font-size: 9px;
+  font-size: 10px;
   text-overflow: ellipsis;
 }
 
@@ -438,12 +543,12 @@
 
 .dv-comparison span {
   color: var(--muted, #7f8da3);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-comparison code {
   overflow: hidden;
-  font-size: 9px;
+  font-size: 10px;
   text-overflow: ellipsis;
 }
 
@@ -477,7 +582,7 @@
 
 .dv-branch-result em {
   color: var(--muted, #7f8da3);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .dv-call-event {
@@ -512,14 +617,14 @@
 
 .dv-pc-flow span {
   color: var(--muted, #7f8da3);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .dv-pc-flow code,
 .dv-lr-change code {
   overflow: hidden;
   color: var(--text, #dce5f2);
-  font-size: 9px;
+  font-size: 10px;
   text-overflow: ellipsis;
 }
 
@@ -539,7 +644,7 @@
 
 .dv-lr-change small {
   color: var(--muted, #7f8da3);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .dv-call-stack {
@@ -567,7 +672,7 @@
 
 .dv-call-stack code {
   color: var(--muted, #7f8da3);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .dv-call-push li:last-child {
@@ -587,6 +692,7 @@
 .dv-compact .dv-header,
 .dv-compact .dv-card,
 .dv-compact .dv-register-changes,
+.dv-compact .dv-phase-timeline,
 .dv-compact .dv-data-flow,
 .dv-compact .dv-stack {
   grid-column: 1;
@@ -689,6 +795,7 @@
 
   .dv-header,
   .dv-register-changes,
+  .dv-phase-timeline,
   .dv-data-flow,
   .dv-stack {
     grid-column: 1;
@@ -707,6 +814,14 @@
 
   .dv-flow-track {
     grid-template-columns: 1fr;
+  }
+
+  .dv-phase-track {
+    grid-template-columns: 1fr;
+  }
+
+  .dv-phase-arrow {
+    transform: rotate(90deg);
   }
 
   .dv-operation svg {
@@ -737,7 +852,7 @@
   .dv-stack-address,
   .dv-stack-cell code,
   .dv-register-change code {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .dv-write-marker,

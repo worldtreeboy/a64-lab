@@ -1,1327 +1,2284 @@
 import type { Lesson } from './types';
 
-export const LESSONS: Lesson[] = [
+const asm = (...lines: string[]): string => lines.join('\n');
+
+const PROGRAMS = {
+  meet: asm('mov x0, 10'),
+  registers: asm('mov x0, 10', 'mov x2, x0'),
+  widths: asm('mov x0, 0x1122334455667788', 'mov w0, 1'),
+  arithmetic: asm('mov x0, 10', 'mov x1, 20', 'add x2, x0, x1', 'sub x3, x2, #5'),
+  pointers: asm('mov x0, 42', 'mov x1, 0x400000'),
+  store: asm('mov x1, 0x400000', 'mov x0, 42', 'str x0, [x1]'),
+  load: asm('mov x1, 0x400000', 'mov x0, 42', 'str x0, [x1]', 'ldr x2, [x1]'),
+  offsets: asm('mov x1, 0x400000', 'mov x0, 99', 'str x0, [x1, #8]', 'ldr x2, [x1, #8]'),
+  endian: asm('mov x0, 0x1122334455667788', 'mov x1, 0x400000', 'str x0, [x1]', 'ldr x2, [x1]'),
+  stack: asm('sub sp, sp, #16', 'add sp, sp, #16'),
+  stackValue: asm('mov x0, 42', 'sub sp, sp, #16', 'str x0, [sp]', 'ldr x1, [sp]', 'add sp, sp, #16'),
+  compare: asm('mov x0, 5', 'mov x1, 5', 'cmp x0, x1', 'mov x1, 7', 'cmp x0, x1'),
+  branch: asm('mov x0, 1', 'b end', 'mov x0, 99', 'end:', '    mov x1, x0'),
+  equalityBranch: asm(
+    'mov x0, 5',
+    'mov x1, 7',
+    'cmp x0, x1',
+    'b.ne notequal',
+    'mov x2, 0',
+    'b end',
+    'notequal:',
+    '    mov x2, 1',
+    'end:',
+    '    mov x3, x2',
+  ),
+  signedFlags: asm('mov x0, 5', 'mov x1, 7', 'cmp x0, x1'),
+  orderedBranch: asm(
+    'mov x0, 5',
+    'mov x1, 7',
+    'cmp x0, x1',
+    'b.lt less',
+    'mov x2, 0',
+    'b end',
+    'less:',
+    '    mov x2, 1',
+    'end:',
+    '    mov x3, x2',
+  ),
+  linkRegister: asm('_start:', '    bl foo', '    b end', 'foo:', '    mov x0, 1', 'end:'),
+  returnFlow: asm(
+    '_start:',
+    '    bl foo',
+    '    b end',
+    'foo:',
+    '    mov x0, 1',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  arguments: asm(
+    '_start:',
+    '    mov x0, 10',
+    '    mov x1, 20',
+    '    bl inspect',
+    '    b end',
+    'inspect:',
+    '    add x2, x0, x1',
+    '    ret',
+    'end:',
+    '    mov x3, x2',
+  ),
+  results: asm(
+    '_start:',
+    '    mov x0, 10',
+    '    mov x1, 20',
+    '    bl addnumbers',
+    '    mov x2, x0',
+    '    b end',
+    'addnumbers:',
+    '    add x0, x0, x1',
+    '    ret',
+    'end:',
+    '    mov x3, x2',
+  ),
+  saveLink: asm(
+    '_start:',
+    '    mov x0, 5',
+    '    bl foo',
+    '    b end',
+    'foo:',
+    '    sub sp, sp, #16',
+    '    str x30, [sp]',
+    '    bl bar',
+    '    ldr x30, [sp]',
+    '    add sp, sp, #16',
+    '    ret',
+    'bar:',
+    '    add x0, x0, #10',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  pair: asm(
+    'mov x29, 0x1111',
+    'mov x30, 0x2222',
+    'sub sp, sp, #16',
+    'stp x29, x30, [sp]',
+    'mov x29, 0',
+    'mov x30, 0',
+    'ldp x29, x30, [sp]',
+    'add sp, sp, #16',
+  ),
+  indexed: asm(
+    'mov x29, 0x1111',
+    'mov x30, 0x2222',
+    'stp x29, x30, [sp, #-16]!',
+    'mov x29, 0',
+    'mov x30, 0',
+    'ldp x29, x30, [sp], #16',
+  ),
+  framePointer: asm(
+    'sub sp, sp, #32',
+    'mov x29, sp',
+    'sub sp, sp, #16',
+    'mov x0, x29',
+    'add sp, sp, #16',
+    'add sp, sp, #32',
+  ),
+  frame: asm(
+    '_start:',
+    '    bl function',
+    '    b end',
+    'function:',
+    '    stp x29, x30, [sp, #-16]!',
+    '    mov x29, sp',
+    '    mov x0, 42',
+    '    ldp x29, x30, [sp], #16',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  nested: asm(
+    '_start:',
+    '    mov x0, 5',
+    '    bl foo',
+    '    b end',
+    'foo:',
+    '    stp x29, x30, [sp, #-16]!',
+    '    mov x29, sp',
+    '    bl bar',
+    '    ldp x29, x30, [sp], #16',
+    '    ret',
+    'bar:',
+    '    add x0, x0, #10',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  sections: asm('.section .data', '.section .text', '_start:', '    mov x0, 1'),
+  strings: asm(
+    '.section .data',
+    'raw:',
+    '    .ascii "ARM64"',
+    'message:',
+    '    .asciz "hello\\n"',
+    '.section .text',
+    '_start:',
+    '    mov x0, 0',
+  ),
+  labelAddress: asm(
+    '.section .data',
+    'message:',
+    '    .asciz "hello"',
+    '.section .text',
+    '_start:',
+    '    ldr x1, =message',
+  ),
+  exit: asm('_start:', '    mov x0, 0', '    mov x8, 93', '    svc 0'),
+  write: asm(
+    '.section .data',
+    'message:',
+    '    .asciz "hello\\n"',
+    '.section .text',
+    '.globl _start',
+    '_start:',
+    '    mov x0, 1',
+    '    ldr x1, =message',
+    '    mov x2, 6',
+    '    mov x8, 64',
+    '    svc 0',
+    '    mov x0, 0',
+    '    mov x8, 93',
+    '    svc 0',
+  ),
+  disassembly: asm(
+    '_start:',
+    '    mov x0, 41',
+    '    bl function',
+    '    b end',
+    'function:',
+    '    stp x29, x30, [sp, #-32]!',
+    '    mov x29, sp',
+    '    str x0, [sp, #16]',
+    '    ldr x0, [sp, #16]',
+    '    add x0, x0, #1',
+    '    ldp x29, x30, [sp], #32',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  cMapping: asm(
+    '_start:',
+    '    mov w0, 10',
+    '    mov w1, 20',
+    '    bl addints',
+    '    b end',
+    'addints:',
+    '    add w0, w0, w1',
+    '    ret',
+    'end:',
+    '    mov w2, w0',
+  ),
+  debug: asm(
+    'mov x1, 0x4141414141414141',
+    'mov x29, sp',
+    'sub sp, sp, #32',
+    'mov x30, 0x4141414141414141',
+    'mov x2, x1',
+  ),
+  indirect: asm(
+    '_start:',
+    '    mov x0, 5',
+    '    ldr x8, =worker',
+    '    blr x8',
+    '    ldr x9, =end',
+    '    br x9',
+    'worker:',
+    '    add x0, x0, #10',
+    '    ret',
+    'end:',
+    '    mov x1, x0',
+  ),
+  synthesis: asm(
+    '_start:',
+    '    mov x0, 5',
+    '    bl transform',
+    '    b end',
+    'transform:',
+    '    stp x29, x30, [sp, #-16]!',
+    '    mov x29, sp',
+    '    add x0, x0, #10',
+    '    cmp x0, #15',
+    '    b.ne restore',
+    '    mov x1, x0',
+    'restore:',
+    '    ldp x29, x30, [sp], #16',
+    '    ret',
+    'end:',
+    '    mov x2, x0',
+  ),
+} as const;
+
+export const LESSONS: Lesson[] = ([
   {
     id: 'meet-arm64',
     order: 1,
     title: 'Meet ARM64',
     shortTitle: 'Meet ARM64',
-    description: 'Build a practical mental model of instructions, registers, memory, and execution.',
-    estimatedMinutes: 7,
+    description: 'Begin with one idea: each instruction changes a small piece of CPU state.',
+    estimatedMinutes: 5,
+    kind: 'concept',
+    coreIdea: 'ARM64 code is a sequence of small state changes.',
+    newConcepts: ['cpu-state'],
+    buildsOn: [],
+    registerFocus: ['x0'],
+    visualPrompt: 'Show one instruction entering the CPU and only X0 changing from 0 to 10.',
     sections: [
       {
-        id: 'aarch64-name',
-        title: 'ARM64 and AArch64',
+        id: 'one-step-at-a-time',
+        title: 'One instruction at a time',
         paragraphs: [
-          'AArch64 is Arm\'s 64-bit execution state and instruction set. ARM64 is the common platform name for the same 64-bit environment.',
-          'Native Android libraries commonly contain AArch64 code, so these names appear often in disassemblers and debuggers.',
+          'AArch64 is Arm\'s official name for its 64-bit instruction set. ARM64 is the common name for the same environment.',
+          'For now, treat the CPU as a machine that reads one instruction, performs one small action, and keeps the resulting state.',
         ],
         diagram: 'mental-model',
       },
       {
-        id: 'machine-state',
-        title: 'The machine state',
+        id: 'first-state-change',
+        title: 'Put 10 into X0',
         paragraphs: [
-          'The CPU is the processor that executes instructions. An instruction is one small command, such as copying a value or adding two values.',
-          'A register is a small named storage location inside the CPU. Memory is a larger collection of bytes, and each byte has a numeric address.',
-          'The stack is a memory region functions use for saved state and temporary values.',
-          'PC holds the current instruction address. After an ordinary instruction, execution advances to the next instruction; a branch can choose another address.',
+          'The instruction mov x0, 10 changes one named storage location: X0. Nothing else needs to be understood yet.',
         ],
-        bullets: [
-          'Registers: fast values, arguments, pointers, and results',
-          'Memory: bytes located by addresses',
-          'SP: the current top of the stack',
-          'PC: the instruction being executed',
-        ],
-      },
-      {
-        id: 'first-instruction',
-        title: 'One instruction at a time',
-        paragraphs: [
-          'A common shape is instruction destination, source. Some instructions have more operands, but reading from left to right is a useful start.',
-          'The destination is where the result goes; the source provides the value being used.',
-        ],
-        codeLabel: 'Put 10 into X0',
-        code: `mov x0, 10`,
-        callout: 'Step once and watch X0 change while PC advances by 4 bytes.',
+        code: PROGRAMS.meet,
+        walkthrough: {
+          before: ['X0 = 0'],
+          execute: 'mov x0, 10',
+          after: ['X0 = 10'],
+        },
+        callout: 'Press Step once. The highlighted instruction executes, then X0 changes.',
       },
     ],
-    quiz: [
-      {
-        id: 'meet-pc-role',
-        prompt: 'What does PC identify while an ARM64 program is running?',
-        options: [
-          { id: 'a', label: 'The current instruction address' },
-          { id: 'b', label: 'The first function argument' },
-          { id: 'c', label: 'The top stack value' },
-          { id: 'd', label: 'The last memory byte written' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'PC is the program counter: it identifies the instruction address currently selected for execution.',
-      },
-    ],
-    labProgram: `mov x0, 10`,
+    quiz: [{
+      id: 'meet-first-change',
+      prompt: 'What changes after this instruction?',
+      code: PROGRAMS.meet,
+      options: [
+        { id: 'a', label: 'X0 becomes 10' },
+        { id: 'b', label: 'X10 becomes 0' },
+        { id: 'c', label: 'The stack moves' },
+        { id: 'd', label: 'Memory is printed' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'MOV places 10 in its destination, X0.',
+    }],
+    labProgram: PROGRAMS.meet,
+    nextStep: 'You have seen one state change. Next, learn what the X register names mean.',
+    visualFocus: ['registers'],
   },
   {
     id: 'registers',
     order: 2,
-    title: 'Registers',
+    title: 'General Registers',
     shortTitle: 'Registers',
-    description: 'Learn the core general-purpose registers and the important FP, LR, SP, and PC roles.',
-    estimatedMinutes: 9,
+    description: 'Use X0–X30 as the CPU\'s small named storage boxes.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'A general register holds one 64-bit value until an instruction changes it.',
+    newConcepts: ['general-registers', 'mov-copy'],
+    buildsOn: ['cpu-state'],
     prerequisites: ['meet-arm64'],
+    registerFocus: ['x0', 'x2'],
+    visualPrompt: 'Show X0 and X2 as separate boxes, then animate a copy from X0 to X2 without clearing X0.',
     sections: [
       {
-        id: 'register-map',
-        title: 'The register map',
+        id: 'named-storage',
+        title: 'Small storage inside the CPU',
         paragraphs: [
-          'X0–X30 are 64-bit general-purpose registers. Their W0–W30 names access only the lower 32 bits.',
-          'Writing a W register clears the upper 32 bits of its matching X register. Reading W0 reads the low half of X0.',
-          'SP points to the current top of the stack, PC selects the current instruction, X29 / FP can anchor a function’s stack frame, and X30 / LR can hold the address to return to after a call.',
+          'X0 through X30 are general-purpose registers. Each can hold a 64-bit number, address, or intermediate result.',
+          'The instruction using a value gives that value its meaning.',
         ],
-        bullets: [
-          'X0–X7: commonly integer or pointer arguments',
-          'X0: commonly the return value',
-          'X29 / FP: frame pointer',
-          'X30 / LR: link register',
-          'SP: stack pointer',
-          'PC: current instruction address',
+        diagram: 'general-registers',
+      },
+      {
+        id: 'copy-does-not-move',
+        title: 'MOV copies a value',
+        paragraphs: [
+          'mov x2, x0 reads X0 and writes the same value into X2. X0 keeps its value.',
+        ],
+        code: PROGRAMS.registers,
+        walkthrough: {
+          before: ['X0 = 10', 'X2 = 0'],
+          execute: 'mov x2, x0',
+          after: ['X0 = 10 (unchanged)', 'X2 = 10'],
+        },
+        callout: 'Destination first: X2 receives the copy.',
+      },
+    ],
+    quiz: [{
+      id: 'register-copy',
+      prompt: 'What is X2 after both instructions?',
+      code: PROGRAMS.registers,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '10' },
+        { id: 'c', label: '20' },
+        { id: 'd', label: 'The address of X0' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'The second MOV copies the value 10 from X0 into X2.',
+    }],
+    labProgram: PROGRAMS.registers,
+    nextStep: 'X registers hold 64 bits. Next, see their matching 32-bit W view.',
+    visualFocus: ['registers'],
+  },
+  {
+    id: 'x-w-registers',
+    order: 3,
+    title: 'X and W Registers',
+    shortTitle: 'X and W',
+    description: 'See X0 and W0 as two widths of the same register.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'W0 is the lower 32-bit view of X0, and a W write clears X0\'s upper half.',
+    newConcepts: ['register-width-aliases', 'w-write-zero-extension'],
+    buildsOn: ['general-registers'],
+    prerequisites: ['registers'],
+    registerFocus: ['x0'],
+    visualPrompt: 'Draw one 64-bit X0 bar split into upper and lower halves, label the lower half W0, then clear the upper half on the W0 write.',
+    sections: [
+      {
+        id: 'same-storage',
+        title: 'One register, two widths',
+        paragraphs: [
+          'X0 names all 64 bits. W0 names only the lower 32 bits of that same storage; it is not a separate register.',
         ],
         diagram: 'register-map',
       },
       {
-        id: 'copying-registers',
-        title: 'Values can be copied',
+        id: 'w-write',
+        title: 'A W write clears the upper bits',
         paragraphs: [
-          'MOV can place an immediate value in a register or copy one register into another. Copying does not erase the source.',
+          'Writing W0 stores a 32-bit value and zeroes the upper 32 bits of X0. This is standard AArch64 behavior.',
         ],
-        code: `mov x0, 10
-mov x1, 20
-mov x2, x0`,
-        callout: 'After the third instruction, X0 and X2 both contain 10.',
-      },
-      {
-        id: 'w-register-write',
-        title: 'W and X are two views',
-        paragraphs: [
-          'W0 is not a separate storage location. It is the lower half of X0, with special zero-extending write behavior.',
-        ],
-        code: `mov x0, 0x1122334455667788
-mov w0, 1`,
-        callout: 'The final X0 value is 1 because writing W0 clears the upper half.',
+        code: PROGRAMS.widths,
+        walkthrough: {
+          before: ['X0 = 0x1122334455667788'],
+          execute: 'mov w0, 1',
+          after: ['W0 = 1', 'X0 = 0x0000000000000001'],
+        },
+        callout: 'The Lab displays canonical X0; watch its upper half become zero.',
       },
     ],
-    quiz: [
-      {
-        id: 'registers-copy',
-        prompt: 'What will X2 contain after these instructions?',
-        code: `mov x0, 10
-mov x1, 20
-mov x2, x0`,
-        options: [
-          { id: 'a', label: '0' },
-          { id: 'b', label: '10' },
-          { id: 'c', label: '20' },
-          { id: 'd', label: '30' },
-        ],
-        correctOptionId: 'b',
-        explanation: 'MOV copies the value in X0 into X2, so X2 becomes 10.',
-      },
-    ],
-    labProgram: `mov x0, 10
-mov x1, 20
-mov x2, x0`,
+    quiz: [{
+      id: 'w-write-zeroes-upper',
+      prompt: 'What is X0 after the final instruction?',
+      code: asm('mov x0, 0xffffffffffffffff', 'mov w0, 5'),
+      options: [
+        { id: 'a', label: '0xffffffffffffffff' },
+        { id: 'b', label: '0xffffffff00000005' },
+        { id: 'c', label: '0x0000000000000005' },
+        { id: 'd', label: '0x00000000ffffffff' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'Writing W0 sets the lower 32 bits and clears the upper 32 bits of X0.',
+    }],
+    labProgram: PROGRAMS.widths,
+    nextStep: 'Now use register values as inputs to arithmetic.',
+    visualFocus: ['registers'],
   },
   {
     id: 'mov-arithmetic',
-    order: 3,
+    order: 4,
     title: 'MOV and Arithmetic',
     shortTitle: 'Arithmetic',
-    description: 'Move values and combine register or immediate operands with ADD and SUB.',
-    estimatedMinutes: 8,
+    description: 'Read ADD and SUB as source values flowing into one destination.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'Arithmetic reads its source operands and writes the result to its destination.',
+    newConcepts: ['arithmetic-dataflow', 'immediate-operand'],
+    buildsOn: ['general-registers', 'mov-copy'],
     prerequisites: ['registers'],
+    registerFocus: ['x0', 'x1', 'x2', 'x3'],
+    visualPrompt: 'Show X0 and X1 flowing into ADD and only X2 changing; then show the literal #5 flowing into SUB.',
     sections: [
       {
-        id: 'mov-values',
-        title: 'MOV establishes values',
+        id: 'destination-and-sources',
+        title: 'Read destination, then sources',
         paragraphs: [
-          'MOV copies a value into its destination. An immediate is a constant written directly in the instruction.',
+          'add x2, x0, x1 means X2 = X0 + X1. The two source registers stay unchanged.',
+          'SUB follows the same direction. A value such as #5 is an immediate: the number is written directly in the instruction.',
         ],
-        code: `mov x0, 10
-mov x1, 20`,
-      },
-      {
-        id: 'add-sub',
-        title: 'ADD and SUB',
-        paragraphs: [
-          'ADD and SUB read their source operands and write the result to the first register. The source can be another register or an immediate.',
-          'The # in #5 marks 5 as an immediate constant rather than a register.',
-        ],
-        code: `mov x0, 10
-mov x1, 20
-add x2, x0, x1
-sub x3, x2, #5`,
         diagram: 'arithmetic',
-        callout: 'X2 becomes 30, then X3 becomes 25.',
       },
-    ],
-    quiz: [
       {
-        id: 'arithmetic-x3',
-        prompt: 'What will X3 contain after the final instruction?',
-        code: `mov x0, 10
-mov x1, 20
-add x2, x0, x1
-sub x3, x2, #5`,
-        options: [
-          { id: 'a', label: '5' },
-          { id: 'b', label: '15' },
-          { id: 'c', label: '25' },
-          { id: 'd', label: '35' },
+        id: 'calculate-in-steps',
+        title: 'Build 30, then subtract 5',
+        paragraphs: [
+          'Follow one destination at a time instead of solving the whole program at once.',
         ],
-        correctOptionId: 'c',
-        explanation: 'ADD makes X2 equal 30, and subtracting the immediate 5 leaves 25 in X3.',
+        code: PROGRAMS.arithmetic,
+        walkthrough: {
+          before: ['X0 = 10', 'X1 = 20', 'X2 = 0', 'X3 = 0'],
+          execute: 'add x2, x0, x1; then sub x3, x2, #5',
+          after: ['X0 = 10 and X1 = 20 (unchanged)', 'X2 = 30', 'X3 = 25'],
+        },
+        callout: 'Sources are read; the named destination is written.',
       },
     ],
-    labProgram: `mov x0, 10
-mov x1, 20
-add x2, x0, x1
-sub x3, x2, #5`,
+    quiz: [{
+      id: 'arithmetic-result',
+      prompt: 'What is X3 after the program?',
+      code: PROGRAMS.arithmetic,
+      options: [
+        { id: 'a', label: '5' },
+        { id: 'b', label: '25' },
+        { id: 'c', label: '30' },
+        { id: 'd', label: '35' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'ADD makes X2 = 30. SUB then makes X3 = 30 - 5 = 25.',
+    }],
+    labProgram: PROGRAMS.arithmetic,
+    nextStep: 'Registers can also hold locations. Next, learn what an address and pointer mean.',
+    visualFocus: ['registers'],
   },
   {
     id: 'addresses-pointers',
-    order: 4,
+    order: 5,
     title: 'Addresses and Pointers',
     shortTitle: 'Pointers',
-    description: 'See how a register can name a location in memory and how dereferencing reads that location.',
-    estimatedMinutes: 10,
+    description: 'Interpret an ordinary number as the location of bytes in memory.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'A pointer is a value that code interprets as a memory address.',
+    newConcepts: ['memory-address', 'pointer'],
+    buildsOn: ['general-registers'],
     prerequisites: ['registers'],
+    registerFocus: ['x0', 'x1'],
+    visualPrompt: 'Contrast X0 holding ordinary data with X1 holding an address, then draw X1 pointing to a numbered memory location.',
     sections: [
       {
-        id: 'address-as-value',
-        title: 'An address is a value',
+        id: 'numbered-memory',
+        title: 'Memory has numbered locations',
         paragraphs: [
-          'An address is the number assigned to a location in memory. A pointer is a value interpreted as an address rather than ordinary numeric data.',
-          'If X1 contains 0x400000, the debugger can follow X1 to the memory stored there.',
+          'An address is the number of a location in memory. Memory stores bytes at those numbered locations.',
+          'A pointer is simply a value we intend to use as an address. The bits themselves do not announce “pointer.”',
         ],
-        diagram: 'pointer',
-        callout: 'X1 = 0x400000 → memory → "android"',
+        diagram: 'address-number',
       },
       {
-        id: 'address-versus-load',
-        title: 'Obtain an address or read memory',
+        id: 'same-kind-of-bits',
+        title: 'Meaning comes from use',
         paragraphs: [
-          'Dereferencing a pointer means accessing the memory at the address it contains. Square brackets request that access.',
-          'A label is a readable name attached to an address. In this first string example, .data selects data memory and message names the first byte of "android"; a later lesson explains each directive in detail.',
-          'The equals form puts a label address into the destination. Brackets instead dereference an address already held in a register.',
+          'Here, 42 is ordinary data. We plan to use 0x400000 as a location, so X1 is acting as a pointer.',
         ],
-        bullets: [
-          'ldr x1, =message → X1 receives the address of message',
-          'ldr x2, [x1] → X2 receives 8 bytes read at the address in X1',
-        ],
-        code: `.data
-message:
-    .asciz "android"
-
-.text
-_start:
-    ldr x1, =message
-    ldr x2, [x1]`,
-        callout: 'An equals sign obtains an address; square brackets read through a pointer.',
+        code: PROGRAMS.pointers,
+        walkthrough: {
+          before: ['X0 = 0', 'X1 = 0'],
+          execute: 'mov x0, 42; then mov x1, 0x400000',
+          after: ['X0 = 42 (ordinary data)', 'X1 = 0x400000 (pointer candidate)'],
+        },
+        callout: 'No memory access happens yet. X1 only contains an address.',
       },
     ],
-    quiz: [
+    quiz: [{
+      id: 'pointer-definition',
+      prompt: 'Which statement best describes a pointer?',
+      options: [
+        { id: 'a', label: 'A value interpreted as a memory address' },
+        { id: 'b', label: 'A register that holds only strings' },
+        { id: 'c', label: 'The bytes stored in memory' },
+        { id: 'd', label: 'An instruction that prints an address' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'A pointer is an ordinary value that code uses as an address.',
+    }],
+    labProgram: PROGRAMS.pointers,
+    nextStep: 'X1 now names a location. Next, store a value through that pointer.',
+    visualFocus: ['registers', 'pointers'],
+  },
+  {
+    id: 'memory-store',
+    order: 6,
+    title: 'Store Through a Pointer',
+    shortTitle: 'STR',
+    description: 'Use square brackets and STR to move a register value into memory.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'STR dereferences a pointer and copies a register value into memory.',
+    newConcepts: ['dereference', 'str'],
+    buildsOn: ['pointer'],
+    prerequisites: ['addresses-pointers'],
+    registerFocus: ['x0', 'x1'],
+    visualPrompt: 'Show X1 pointing at one memory cell, then animate 42 from X0 into that cell while X0 and X1 remain unchanged.',
+    sections: [
       {
-        id: 'pointers-equals',
-        prompt: 'What does the first instruction place in X1?',
-        code: `ldr x1, =message
-ldr x2, [x1]`,
-        options: [
-          { id: 'a', label: 'The address of message' },
-          { id: 'b', label: 'The first 8 bytes of message' },
-          { id: 'c', label: 'The length of message' },
-          { id: 'd', label: 'The current stack pointer' },
+        id: 'brackets-access-memory',
+        title: 'Square brackets mean use the address',
+        paragraphs: [
+          'Dereferencing means accessing memory at a pointer\'s address. In [x1], square brackets tell the CPU to use X1 as a memory location.',
+          'STR means Store Register. Its direction is register → memory.',
         ],
-        correctOptionId: 'a',
-        explanation: 'The =label pseudo-instruction loads the label address. The bracketed instruction performs the later memory read.',
+        diagram: 'memory-store',
+      },
+      {
+        id: 'store-forty-two',
+        title: 'Copy 42 into memory',
+        paragraphs: [
+          'str x0, [x1] writes eight bytes at the address in X1. The pointer and source register do not change.',
+        ],
+        code: PROGRAMS.store,
+        walkthrough: {
+          before: ['X0 = 42', 'X1 = 0x400000', 'memory[0x400000] = 0'],
+          execute: 'str x0, [x1]',
+          after: ['X0 = 42 (unchanged)', 'X1 = 0x400000 (unchanged)', 'memory[0x400000] = 42'],
+        },
+        callout: 'Follow the direction: X0 → memory at the address in X1.',
       },
     ],
-    labProgram: `.data
-message:
-    .asciz "android"
-
-.text
-_start:
-    ldr x1, =message
-    ldr x2, [x1]`,
+    quiz: [{
+      id: 'store-direction',
+      prompt: 'What changes after STR?',
+      code: PROGRAMS.store,
+      options: [
+        { id: 'a', label: 'Memory at 0x400000 becomes 42' },
+        { id: 'b', label: 'X1 becomes 42' },
+        { id: 'c', label: 'X0 becomes 0x400000' },
+        { id: 'd', label: 'SP moves by eight bytes' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'STR copies X0 into memory addressed by X1. X0 and X1 stay unchanged.',
+    }],
+    labProgram: PROGRAMS.store,
+    nextStep: 'Memory now contains 42. Next, load that value into another register.',
+    visualFocus: ['registers', 'memory'],
   },
   {
     id: 'memory-ldr-str',
-    order: 5,
-    title: 'Memory with LDR and STR',
-    shortTitle: 'Memory',
-    description: 'Store register values in memory and load them back through addresses and offsets.',
-    estimatedMinutes: 10,
-    prerequisites: ['addresses-pointers'],
+    order: 7,
+    title: 'Load Through a Pointer',
+    shortTitle: 'LDR',
+    description: 'Use LDR to copy bytes from memory into a register.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'LDR dereferences a pointer and copies memory into a register.',
+    newConcepts: ['ldr'],
+    buildsOn: ['dereference', 'str'],
+    prerequisites: ['memory-store'],
+    registerFocus: ['x0', 'x1', 'x2'],
+    visualPrompt: 'Start with 42 already stored at the address in X1, then animate that value from memory into X2.',
     sections: [
       {
-        id: 'load-store-direction',
-        title: 'Follow the data direction',
+        id: 'opposite-direction',
+        title: 'Memory to register',
         paragraphs: [
-          'Load and store describe movement from the CPU’s point of view. LDR loads bytes from memory into a register; STR stores a register value into memory.',
-          'The brackets contain the memory address to access. The register outside the brackets supplies or receives the value.',
+          'You already know STR moves register → memory. LDR means Load Register and moves in the other direction: memory → register.',
+          'ldr x2, [x1] reads eight bytes at the address in X1 and places the result in X2.',
         ],
-        bullets: [
-          'STR: register → memory',
-          'LDR: memory → register',
+        diagram: 'memory-load',
+      },
+      {
+        id: 'read-back-value',
+        title: 'Read back the stored value',
+        paragraphs: [
+          'The first three instructions create familiar memory state. Focus on the final LDR.',
+        ],
+        code: PROGRAMS.load,
+        walkthrough: {
+          before: ['X1 = 0x400000', 'memory[0x400000] = 42', 'X2 = 0'],
+          execute: 'ldr x2, [x1]',
+          after: ['X1 = 0x400000 (unchanged)', 'memory[0x400000] = 42 (unchanged)', 'X2 = 42'],
+        },
+        callout: 'Square brackets still mean access memory; LDR determines the direction.',
+      },
+    ],
+    quiz: [{
+      id: 'load-result',
+      prompt: 'What is X2 after the program?',
+      code: PROGRAMS.load,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '42' },
+        { id: 'c', label: '0x400000' },
+        { id: 'd', label: '8' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'STR first stores 42. LDR then reads those bytes into X2.',
+    }],
+    labProgram: PROGRAMS.load,
+    nextStep: 'You can access the exact address in X1. Next, select a nearby address with an offset.',
+    visualFocus: ['registers', 'memory'],
+  },
+  {
+    id: 'memory-offsets',
+    order: 8,
+    title: 'Memory Offsets',
+    shortTitle: 'Offsets',
+    description: 'Reach a nearby byte address without changing the base pointer.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: '[X1, #8] accesses X1 plus eight bytes while X1 remains unchanged.',
+    newConcepts: ['memory-offset'],
+    buildsOn: ['dereference', 'immediate-operand'],
+    prerequisites: ['memory-ldr-str'],
+    registerFocus: ['x0', 'x1', 'x2'],
+    visualPrompt: 'Draw X1 at 0x400000 and a second highlighted cell eight bytes away at 0x400008.',
+    sections: [
+      {
+        id: 'base-plus-bytes',
+        title: 'Base address plus byte offset',
+        paragraphs: [
+          '[x1, #8] means memory at X1 + 8 bytes. This ordinary offset form calculates an address without writing the result back into X1.',
         ],
         diagram: 'load-store',
       },
       {
-        id: 'stack-memory-round-trip',
-        title: 'Store and load the same value',
+        id: 'neighboring-slot',
+        title: 'Store eight bytes away',
         paragraphs: [
-          'After allocating 16 stack bytes, SP is a usable memory address. STR places 42 there, and LDR reads it into X1.',
+          'STR and LDR use the same calculated location, 0x400008.',
         ],
-        code: `mov x0, 42
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
-        callout: 'After LDR, X1 contains 42.',
-      },
-      {
-        id: 'memory-offsets',
-        title: 'Offsets select nearby memory',
-        paragraphs: [
-          'An offset is added to the base address without changing the base register. For example, [sp, #8] refers to the bytes eight addresses above SP.',
-        ],
-        code: `sub sp, sp, #16
-mov x0, 99
-str x0, [sp, #8]
-ldr x1, [sp, #8]
-add sp, sp, #16`,
+        code: PROGRAMS.offsets,
+        walkthrough: {
+          before: ['X1 = 0x400000', 'memory[0x400008] = 0'],
+          execute: 'str x0, [x1, #8]; then ldr x2, [x1, #8]',
+          after: ['X1 = 0x400000 (unchanged)', 'memory[0x400008] = 99', 'X2 = 99'],
+        },
+        callout: 'Offsets are byte counts.',
       },
     ],
-    quiz: [
-      {
-        id: 'memory-round-trip',
-        prompt: 'What will X1 contain after the load?',
-        code: `mov x0, 42
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]`,
-        options: [
-          { id: 'a', label: '0' },
-          { id: 'b', label: '16' },
-          { id: 'c', label: '42' },
-          { id: 'd', label: 'The address in SP' },
-        ],
-        correctOptionId: 'c',
-        explanation: 'STR writes 42 at SP, and LDR reads those same eight bytes into X1.',
-      },
-    ],
-    labProgram: `mov x0, 42
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
+    quiz: [{
+      id: 'offset-address',
+      prompt: 'If X1 is 0x400000, which address does [x1, #8] access?',
+      code: PROGRAMS.offsets,
+      options: [
+        { id: 'a', label: '0x400000' },
+        { id: 'b', label: '0x400008' },
+        { id: 'c', label: '0x400010' },
+        { id: 'd', label: '8' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'The CPU adds the eight-byte offset to the base address.',
+    }],
+    labProgram: PROGRAMS.offsets,
+    nextStep: 'Offsets locate bytes. Next, see the order of bytes inside one 64-bit value.',
+    visualFocus: ['registers', 'memory'],
   },
   {
     id: 'little-endian',
-    order: 6,
+    order: 9,
     title: 'Little Endian',
     shortTitle: 'Little Endian',
-    description: 'Connect a 64-bit register value to the byte order shown in memory.',
+    description: 'See how one multi-byte value is ordered across increasing addresses.',
     estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'Little-endian memory stores the least-significant byte at the lowest address.',
+    newConcepts: ['little-endian'],
+    buildsOn: ['str', 'ldr'],
     prerequisites: ['memory-ldr-str'],
+    registerFocus: ['x0', 'x1', 'x2'],
+    visualPrompt: 'Connect the register value 0x1122334455667788 to memory bytes 88 77 66 55 44 33 22 11 from low to high address.',
     sections: [
       {
         id: 'byte-order',
-        title: 'Least-significant byte first',
+        title: 'Lowest address first',
         paragraphs: [
-          'AArch64 normally uses little-endian data storage. The least-significant byte of a multi-byte value is placed at the lowest address.',
-          'The least-significant byte is the rightmost byte in the written hexadecimal value—the part representing the smallest place values.',
-          'The register still displays the value normally; byte order becomes visible when that value is stored in memory.',
+          'The least-significant byte of 0x1122334455667788 is 0x88. Little-endian storage puts 0x88 at the lowest address, followed by 77, 66, and so on.',
+          'The value itself is not reversed. Loading all eight bytes reconstructs the original value.',
         ],
         diagram: 'little-endian',
       },
       {
-        id: 'store-eight-bytes',
-        title: 'Watch the bytes appear',
+        id: 'store-and-rebuild',
+        title: 'Watch eight bytes appear',
         paragraphs: [
-          'Storing 0x1122334455667788 as eight bytes produces 88 77 66 55 44 33 22 11 from low address to high address.',
+          'Step STR, inspect memory from 0x400000 upward, then step LDR.',
         ],
-        code: `mov x0, 0x1122334455667788
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
-        callout: 'Register: 0x1122334455667788 ↔ memory: 88 77 66 55 44 33 22 11',
+        code: PROGRAMS.endian,
+        walkthrough: {
+          before: ['X0 = 0x1122334455667788', 'memory bytes are zero'],
+          execute: 'str x0, [x1]; then ldr x2, [x1]',
+          after: ['Memory = 88 77 66 55 44 33 22 11', 'X2 = 0x1122334455667788'],
+        },
+        callout: 'Byte order matters only when viewing a multi-byte value one byte at a time.',
       },
     ],
-    quiz: [
-      {
-        id: 'endian-first-byte',
-        prompt: 'Which byte appears at the lowest address after this value is stored?',
-        code: `mov x0, 0x1122334455667788
-str x0, [sp]`,
-        options: [
-          { id: 'a', label: '0x11' },
-          { id: 'b', label: '0x22' },
-          { id: 'c', label: '0x77' },
-          { id: 'd', label: '0x88' },
-        ],
-        correctOptionId: 'd',
-        explanation: 'Little-endian storage places the least-significant byte, 0x88, at the lowest address.',
-      },
-    ],
-    labProgram: `mov x0, 0x1122334455667788
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
+    quiz: [{
+      id: 'endian-low-byte',
+      prompt: 'Which byte appears at the lowest address?',
+      code: PROGRAMS.endian,
+      options: [
+        { id: 'a', label: '0x11' },
+        { id: 'b', label: '0x22' },
+        { id: 'c', label: '0x77' },
+        { id: 'd', label: '0x88' },
+      ],
+      correctOptionId: 'd',
+      explanation: '0x88 is the least-significant byte, so little-endian storage places it first.',
+    }],
+    labProgram: PROGRAMS.endian,
+    nextStep: 'Memory now makes sense byte by byte. Next, meet the stack and its pointer.',
+    visualFocus: ['registers', 'memory'],
   },
   {
     id: 'stack',
-    order: 7,
-    title: 'Stack',
-    shortTitle: 'Stack',
-    description: 'Allocate stack space, store a local value, and restore SP when finished.',
-    estimatedMinutes: 9,
-    prerequisites: ['memory-ldr-str'],
+    order: 10,
+    title: 'The Stack and SP',
+    shortTitle: 'Stack & SP',
+    description: 'Treat the stack as a memory region whose current boundary is held in SP.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'Allocating stack space moves SP toward lower addresses; restoring it moves SP back.',
+    newConcepts: ['stack-pointer', 'stack-growth'],
+    buildsOn: ['memory-address', 'arithmetic-dataflow', 'immediate-operand'],
+    prerequisites: ['memory-ldr-str', 'mov-arithmetic'],
+    registerFocus: ['sp'],
+    visualPrompt: 'Show only SP and empty stack addresses; animate SP from 0x...E000 down to 0x...DFF0 and back.',
     sections: [
       {
-        id: 'stack-growth',
-        title: 'The stack grows downward',
+        id: 'stack-is-memory',
+        title: 'A memory workspace',
         paragraphs: [
-          'The stack is a memory region used for saved registers, local values, and function-call state. SP holds the address of its current top.',
-          'The stack typically grows toward lower addresses: a new allocation reduces SP. Subtracting from SP allocates space; adding the same amount restores it.',
-        ],
-        bullets: [
-          'Before: SP → 0x…E000',
-          'sub sp, sp, #16',
-          'After: SP → 0x…DFF0',
+          'The stack is a region of memory used for short-lived function data. SP—the Stack Pointer—holds an address at its current boundary.',
+          'On AArch64, allocating space normally moves SP toward a lower address.',
         ],
         diagram: 'stack-growth',
       },
       {
-        id: 'stack-local',
-        title: 'A temporary local value',
+        id: 'move-sp',
+        title: 'Allocate, then restore',
         paragraphs: [
-          'Code can use allocated stack memory for values that do not stay in registers. Every allocation should have a matching restoration along that path.',
+          'SUB reserves 16 bytes by lowering SP. Adding the same amount restores the starting address.',
         ],
-        code: `mov x0, 42
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
-      },
-      {
-        id: 'stack-alignment',
-        title: 'Keep SP aligned',
-        paragraphs: [
-          'The standard AArch64 calling convention keeps SP aligned to 16 bytes at function-call boundaries. Allocating 16, 32, or another suitable multiple makes that rule easy to follow.',
-          'A64 Lab models the pointer movement directly so you can see allocation and restoration happen.',
-        ],
+        code: PROGRAMS.stack,
+        walkthrough: {
+          before: ['SP = 0x...E000'],
+          execute: 'sub sp, sp, #16; then add sp, sp, #16',
+          after: ['After SUB: SP = 0x...DFF0', 'After ADD: SP = 0x...E000'],
+        },
+        callout: 'For now, use multiples of 16 in stack examples. The convention behind that appears with stack frames.',
       },
     ],
-    quiz: [
-      {
-        id: 'stack-final-sp',
-        prompt: 'Compared with its starting value, where is SP after all four instructions?',
-        code: `sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
-        options: [
-          { id: 'a', label: '16 bytes lower' },
-          { id: 'b', label: '8 bytes lower' },
-          { id: 'c', label: 'Back at its starting value' },
-          { id: 'd', label: '16 bytes higher' },
-        ],
-        correctOptionId: 'c',
-        explanation: 'The final ADD reverses the initial SUB, so SP returns to its starting address.',
-      },
-    ],
-    labProgram: `mov x0, 42
-sub sp, sp, #16
-str x0, [sp]
-ldr x1, [sp]
-add sp, sp, #16`,
+    quiz: [{
+      id: 'stack-direction',
+      prompt: 'What does sub sp, sp, #16 do?',
+      code: PROGRAMS.stack,
+      options: [
+        { id: 'a', label: 'Moves SP 16 bytes toward lower addresses' },
+        { id: 'b', label: 'Stores X16 on the stack' },
+        { id: 'c', label: 'Moves SP eight bytes higher' },
+        { id: 'd', label: 'Loads 16 bytes into SP' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'Subtracting 16 lowers SP by 16 bytes and reserves that stack space.',
+    }],
+    labProgram: PROGRAMS.stack,
+    nextStep: 'SP can reserve space. Next, use that space as ordinary memory.',
+    visualFocus: ['stack'],
   },
   {
-    id: 'stack-frames',
-    order: 8,
-    title: 'STP / LDP and Stack Frames',
-    shortTitle: 'Stack Frames',
-    description: 'Recognize paired saves, frame setup, and pre/post-indexed stack addressing.',
-    estimatedMinutes: 12,
-    prerequisites: ['stack', 'registers'],
+    id: 'stack-values',
+    order: 11,
+    title: 'Values on the Stack',
+    shortTitle: 'Stack Values',
+    description: 'Store one temporary value in allocated stack memory and load it back.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'Allocated stack space is ordinary memory addressed through SP.',
+    newConcepts: ['stack-local'],
+    buildsOn: ['stack-pointer', 'stack-growth', 'str', 'ldr'],
+    prerequisites: ['stack', 'memory-ldr-str'],
+    registerFocus: ['x0', 'x1', 'sp'],
+    visualPrompt: 'Show SP, X0, X1, and one stack slot only; animate 42 into the slot and then into X1.',
     sections: [
       {
-        id: 'save-frame-state',
-        title: 'Save FP and LR together',
+        id: 'reuse-known-memory-tools',
+        title: 'You already know the instructions',
         paragraphs: [
-          'A stack frame is the part of the stack a function owns during one call. X29 / FP can provide a stable reference inside that frame, while X30 / LR holds the caller’s return address.',
-          'STP means store pair, so it writes two registers to neighboring memory slots. The ! form is pre-indexed: it updates SP before using the new address.',
+          'After SUB reserves space, [sp] is simply a memory address. STR can store there and LDR can read from there.',
+          'A temporary value belonging to one function is often called a local value.',
         ],
-        bullets: [
-          'SP -= 16',
-          'memory[SP] = X29',
-          'memory[SP + 8] = X30',
-        ],
-        code: `stp x29, x30, [sp, #-16]!
-mov x29, sp`,
-        diagram: 'stack-frame',
+        diagram: 'memory-store',
       },
       {
-        id: 'restore-frame-state',
-        title: 'Restore and return',
+        id: 'local-round-trip',
+        title: 'Store, load, restore',
         paragraphs: [
-          'LDP means load pair, so it restores two neighboring values. The offset after the brackets is post-indexed: memory is read at the old SP first, then SP advances.',
+          'Read the program as three stages: allocate space, use one stack slot, restore SP.',
         ],
-        bullets: [
-          'X29 = memory[SP]',
-          'X30 = memory[SP + 8]',
-          'SP += 16',
-        ],
-        code: `ldp x29, x30, [sp], #16
-ret`,
-      },
-      {
-        id: 'complete-small-frame',
-        title: 'A complete small frame',
-        paragraphs: [
-          'Step through the call and watch SP, X29, X30, and the stack slots. RET uses the restored X30.',
-        ],
-        code: `_start:
-    bl function
-    b end
-
-function:
-    stp x29, x30, [sp, #-16]!
-    mov x29, sp
-    mov x0, 42
-    ldp x29, x30, [sp], #16
-    ret
-
-end:
-    mov x1, x0`,
+        code: PROGRAMS.stackValue,
+        walkthrough: {
+          before: ['X0 = 42', 'X1 = 0', 'SP = 0x...E000'],
+          execute: 'SUB; STR X0; LDR X1; ADD',
+          after: ['X1 = 42', 'SP is back at 0x...E000', 'X0 stayed 42'],
+        },
+        callout: 'Restoring SP does not erase the bytes; it ends this function\'s claim on the space.',
       },
     ],
-    quiz: [
-      {
-        id: 'frames-pre-index',
-        prompt: 'When is SP updated by the pre-indexed STP instruction?',
-        code: `stp x29, x30, [sp, #-16]!`,
-        options: [
-          { id: 'a', label: 'Before the pair is stored' },
-          { id: 'b', label: 'After the pair is stored' },
-          { id: 'c', label: 'Only when RET runs' },
-          { id: 'd', label: 'SP is not updated' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'The ! marks pre-index writeback: SP is reduced first, then X29 and X30 are stored at the new stack address.',
-      },
-    ],
-    labProgram: `_start:
-    bl function
-    b end
-
-function:
-    stp x29, x30, [sp, #-16]!
-    mov x29, sp
-    mov x0, 42
-    ldp x29, x30, [sp], #16
-    ret
-
-end:
-    mov x1, x0`,
+    quiz: [{
+      id: 'stack-local-load',
+      prompt: 'What is X1 after the complete program?',
+      code: PROGRAMS.stackValue,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '16' },
+        { id: 'c', label: '42' },
+        { id: 'd', label: 'The final SP address' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'STR stores 42 at SP and LDR reads it into X1.',
+    }],
+    labProgram: PROGRAMS.stackValue,
+    nextStep: 'You can preserve a value in memory. Next, let CMP describe how two values relate.',
+    visualFocus: ['registers', 'stack'],
   },
   {
     id: 'cmp-nzcv',
-    order: 9,
-    title: 'CMP and NZCV',
-    shortTitle: 'Flags',
-    description: 'Read comparison results through the N, Z, C, and V condition flags.',
-    estimatedMinutes: 10,
+    order: 12,
+    title: 'CMP and the Z Flag',
+    shortTitle: 'CMP & Z',
+    description: 'Start comparisons with one useful question: are these values equal?',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'CMP leaves its operands unchanged and sets Z when their difference is zero.',
+    newConcepts: ['comparison', 'zero-flag'],
+    buildsOn: ['arithmetic-dataflow'],
     prerequisites: ['mov-arithmetic'],
+    registerFocus: ['x0', 'x1'],
+    visualPrompt: 'Show X0 and X1 feeding CMP, discard the numeric subtraction result, and spotlight only Z.',
     sections: [
       {
-        id: 'compare-subtraction',
-        title: 'CMP behaves like a subtraction',
+        id: 'compare-without-saving-result',
+        title: 'Subtract only to set flags',
         paragraphs: [
-          'NZCV is a group of four one-bit condition flags: N marks a negative result, Z marks zero, C records carry or no unsigned borrow, and V marks signed overflow.',
-          'CMP calculates a subtraction for its flags but does not save the arithmetic result in a register.',
-          'If the compared values are equal, the conceptual result is zero and Z becomes 1.',
+          'Think of CMP as a subtraction whose numeric result is discarded. It keeps small condition flags instead.',
+          'Z means Zero. Equal values produce a zero difference, so Z becomes 1.',
         ],
-        code: `mov x0, 5
-mov x1, 5
-cmp x0, x1`,
-        callout: '5 - 5 = 0 → Z = 1',
-        diagram: 'flags',
+        diagram: 'zero-flag',
       },
       {
-        id: 'negative-result',
-        title: 'N marks a negative signed result',
+        id: 'equal-then-different',
+        title: 'Watch Z answer equality',
         paragraphs: [
-          'When 5 is compared with 7, the conceptual result is -2. Z is clear and N is set because the result has its sign bit set.',
+          'The first comparison sets Z. Changing X1 to 7 makes the second comparison clear Z.',
         ],
-        code: `mov x0, 5
-mov x1, 7
-cmp x0, x1`,
-        callout: '5 - 7 = -2 → Z = 0, N = 1',
-      },
-      {
-        id: 'carry-overflow',
-        title: 'C and V in brief',
-        paragraphs: [
-          'For CMP subtraction, C indicates no unsigned borrow, so it is set when the left unsigned value is at least the right value.',
-          'V indicates signed overflow: the fixed-width signed result could not be represented. Signed branch conditions combine N and V.',
-        ],
+        code: PROGRAMS.compare,
+        walkthrough: {
+          before: ['X0 = 5', 'X1 = 5', 'Z = 0'],
+          execute: 'cmp x0, x1',
+          after: ['X0 = 5 and X1 = 5 (unchanged)', '5 - 5 = 0', 'Z = 1'],
+        },
+        callout: 'For this lesson, ignore N, C, and V. They come later.',
       },
     ],
-    quiz: [
+    quiz: [{
+      id: 'compare-equal',
+      prompt: 'What is Z immediately after comparing 5 with 5?',
+      code: asm('mov x0, 5', 'mov x1, 5', 'cmp x0, x1'),
+      options: [
+        { id: 'a', label: 'Z = 0' },
+        { id: 'b', label: 'Z = 1' },
+        { id: 'c', label: 'X0 = 0' },
+        { id: 'd', label: 'X1 = 0' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'Five minus five is zero, so CMP sets Z without changing X0 or X1.',
+    }],
+    labProgram: PROGRAMS.compare,
+    nextStep: 'A flag records a fact. Next, learn how B changes which instruction executes.',
+    visualFocus: ['registers', 'flags'],
+    flagFocus: ['Z'],
+  },
+  {
+    id: 'unconditional-branches',
+    order: 13,
+    title: 'Jump with B',
+    shortTitle: 'B & Labels',
+    description: 'Change execution order with an unconditional branch to a code label.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'B replaces the next sequential PC with the address named by a code label.',
+    newConcepts: ['unconditional-branch', 'code-label'],
+    buildsOn: ['cpu-state'],
+    prerequisites: ['cmp-nzcv'],
+    registerFocus: ['x0', 'x1', 'pc'],
+    visualPrompt: 'Show a straight instruction path, then animate PC jumping over one MOV to the end label.',
+    sections: [
       {
-        id: 'flags-equal',
-        prompt: 'Which flag must be set after this comparison?',
-        code: `mov x0, 5
-mov x1, 5
-cmp x0, x1`,
-        options: [
-          { id: 'a', label: 'N' },
-          { id: 'b', label: 'Z' },
-          { id: 'c', label: 'V' },
-          { id: 'd', label: 'None' },
+        id: 'labels-name-code',
+        title: 'A readable name for an instruction address',
+        paragraphs: [
+          'A code label such as end: names an instruction location. The label is not itself an instruction.',
+          'B means branch. It always changes PC to its target label.',
         ],
-        correctOptionId: 'b',
-        explanation: 'Equal operands produce a zero comparison result, which sets Z.',
+        diagram: 'unconditional-branch',
+      },
+      {
+        id: 'skip-one-line',
+        title: 'Jump over a change',
+        paragraphs: [
+          'Because B jumps to end, the instruction that would make X0 = 99 never executes.',
+        ],
+        code: PROGRAMS.branch,
+        walkthrough: {
+          before: ['X0 = 1', 'PC points to b end'],
+          execute: 'b end',
+          after: ['PC points to the instruction at end', 'X0 is still 1'],
+        },
+        callout: 'B makes no decision; it always takes the branch.',
       },
     ],
-    labProgram: `mov x0, 5
-mov x1, 5
-cmp x0, x1
-mov x0, 5
-mov x1, 7
-cmp x0, x1`,
+    quiz: [{
+      id: 'unconditional-result',
+      prompt: 'What is X1 at the end?',
+      code: PROGRAMS.branch,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '1' },
+        { id: 'c', label: '99' },
+        { id: 'd', label: 'The address of end' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'B skips the MOV that would write 99, so X1 receives the original 1.',
+    }],
+    labProgram: PROGRAMS.branch,
+    nextStep: 'B always jumps. Next, let Z decide whether a branch is taken.',
+    visualFocus: ['registers'],
   },
   {
     id: 'branches',
-    order: 10,
-    title: 'Branches',
-    shortTitle: 'Branches',
-    description: 'Follow direct and conditional control flow using labels and NZCV flags.',
-    estimatedMinutes: 11,
-    prerequisites: ['cmp-nzcv'],
+    order: 14,
+    title: 'Equal and Not-Equal Branches',
+    shortTitle: 'B.EQ & B.NE',
+    description: 'Connect the Z flag to the two simplest conditional branches.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'B.EQ branches when Z is 1; B.NE branches when Z is 0.',
+    newConcepts: ['equality-branch'],
+    buildsOn: ['zero-flag', 'unconditional-branch', 'code-label'],
+    prerequisites: ['unconditional-branches', 'cmp-nzcv'],
+    registerFocus: ['x0', 'x1', 'x2', 'x3', 'pc'],
+    visualPrompt: 'Show CMP producing Z, then one B.NE fork marked TAKEN while the sequential path is dimmed.',
     sections: [
       {
-        id: 'branch-family',
-        title: 'Choose the next instruction',
+        id: 'branch-using-z',
+        title: 'One flag, two conditions',
         paragraphs: [
-          'A branch changes control flow by selecting a different instruction address for PC. A label is a readable name for one of those instruction addresses.',
-          'B always jumps to its label. Conditional branches use flags from a preceding comparison to decide whether to jump or continue to the next instruction.',
+          'A conditional branch either jumps or continues to the next instruction. B.EQ checks for Z = 1; B.NE checks for Z = 0.',
         ],
-        bullets: [
-          'B.EQ / B.NE: equal / not equal',
-          'B.GT / B.LT: signed greater / less than',
-          'B.GE / B.LE: signed greater-or-equal / less-or-equal',
-        ],
-      },
-      {
-        id: 'branch-path',
-        title: 'Predict the path',
-        paragraphs: [
-          'Five and seven are different, so CMP clears Z. B.NE sees Z = 0 and transfers control to notequal.',
-        ],
-        code: `mov x0, 5
-mov x1, 7
-cmp x0, x1
-b.ne notequal
-mov x2, 0
-b end
-
-notequal:
-    mov x2, 1
-
-end:
-    mov x3, x2`,
         diagram: 'control-flow',
-        callout: 'CMP → Z = 0 → B.NE → notequal',
       },
-    ],
-    quiz: [
       {
-        id: 'branches-path',
-        prompt: 'Which value reaches X3 in this program?',
-        code: `mov x0, 5
-mov x1, 7
-cmp x0, x1
-b.ne notequal
-mov x2, 0
-b end
-notequal:
-mov x2, 1
-end:
-mov x3, x2`,
-        options: [
-          { id: 'a', label: '0' },
-          { id: 'b', label: '1' },
-          { id: 'c', label: '5' },
-          { id: 'd', label: '7' },
+        id: 'predict-not-equal',
+        title: 'Predict before stepping',
+        paragraphs: [
+          'Five and seven differ, so CMP clears Z. B.NE therefore takes the notequal path.',
         ],
-        correctOptionId: 'b',
-        explanation: 'The values are not equal, so B.NE takes the notequal path and X2, then X3, becomes 1.',
+        code: PROGRAMS.equalityBranch,
+        walkthrough: {
+          before: ['X0 = 5', 'X1 = 7', 'Z = 0 after CMP'],
+          execute: 'b.ne notequal',
+          after: ['Branch = TAKEN', 'PC points to notequal', 'X2 later becomes 1'],
+        },
+        callout: 'Pause after CMP. Read Z first, then predict the branch.',
       },
     ],
-    labProgram: `mov x0, 5
-mov x1, 7
-cmp x0, x1
-b.ne notequal
-mov x2, 0
-b end
-
-notequal:
-    mov x2, 1
-
-end:
-    mov x3, x2`,
+    quiz: [{
+      id: 'not-equal-path',
+      prompt: 'What is X3 at the end?',
+      code: PROGRAMS.equalityBranch,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '1' },
+        { id: 'c', label: '5' },
+        { id: 'd', label: '7' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'Z is 0, so B.NE takes the path that writes 1 into X2 and then X3.',
+    }],
+    labProgram: PROGRAMS.equalityBranch,
+    nextStep: 'Equality needs only Z. Next, add the flags that describe ordered fixed-width comparisons.',
+    visualFocus: ['registers', 'flags'],
+    flagFocus: ['Z'],
+  },
+  {
+    id: 'signed-flags',
+    order: 15,
+    title: 'Signed Comparison Flags',
+    shortTitle: 'N, C & V',
+    description: 'Extend CMP beyond equality without learning branches at the same time.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'N, C, and V record different facts about the same fixed-width subtraction.',
+    newConcepts: ['negative-flag', 'carry-overflow-flags'],
+    buildsOn: ['comparison', 'register-width-aliases'],
+    prerequisites: ['cmp-nzcv', 'x-w-registers'],
+    registerFocus: ['x0', 'x1'],
+    visualPrompt: 'Keep X0 and X1 fixed, show the conceptual subtraction, and reveal N first before the smaller C and V notes.',
+    sections: [
+      {
+        id: 'negative-result',
+        title: 'N starts the signed story',
+        paragraphs: [
+          'N records whether the fixed-width result has its sign bit set. For 5 - 7, the result is -2, so N becomes 1.',
+          'Z remains useful: -2 is not zero, so Z is 0.',
+        ],
+        diagram: 'flags',
+      },
+      {
+        id: 'two-safety-flags',
+        title: 'C and V answer different questions',
+        paragraphs: [
+          'For CMP subtraction, C means no unsigned borrow. V means the signed result overflowed its fixed-width range.',
+          'Do not memorize a truth table yet. Remember that signed ordered branches use N with V, while unsigned comparisons use C.',
+        ],
+        code: PROGRAMS.signedFlags,
+        walkthrough: {
+          before: ['X0 = 5', 'X1 = 7'],
+          execute: 'cmp x0, x1',
+          after: ['Conceptual result = -2', 'N = 1', 'Z = 0'],
+        },
+        callout: 'CMP changes flags, not the compared registers.',
+      },
+    ],
+    quiz: [{
+      id: 'negative-flag-result',
+      prompt: 'Which flag is 1 because 5 - 7 is negative?',
+      code: PROGRAMS.signedFlags,
+      options: [
+        { id: 'a', label: 'N' },
+        { id: 'b', label: 'Z' },
+        { id: 'c', label: 'PC' },
+        { id: 'd', label: 'SP' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'The fixed-width subtraction result is negative, so N is set.',
+    }],
+    labProgram: PROGRAMS.signedFlags,
+    nextStep: 'The flags now describe ordering. Next, use them through signed branch names.',
+    visualFocus: ['registers', 'flags'],
+    flagFocus: ['N', 'Z', 'C', 'V'],
+  },
+  {
+    id: 'ordered-branches',
+    order: 16,
+    title: 'Greater and Less Branches',
+    shortTitle: 'Ordered Branches',
+    description: 'Use one signed branch family after CMP.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'B.GT, B.LT, B.GE, and B.LE turn signed comparison flags into a path choice.',
+    newConcepts: ['signed-ordered-branch'],
+    buildsOn: ['negative-flag', 'carry-overflow-flags', 'equality-branch'],
+    prerequisites: ['signed-flags', 'branches'],
+    registerFocus: ['x0', 'x1', 'x2', 'x3', 'pc'],
+    visualPrompt: 'Show 5 compared with 7, spotlight the signed-less relation, and animate B.LT to the less label.',
+    sections: [
+      {
+        id: 'one-related-family',
+        title: 'Four readable conditions',
+        paragraphs: [
+          'B.GT means signed greater than, B.LT means signed less than, B.GE includes equality, and B.LE includes equality.',
+          'They use the flags from CMP; they do not compare registers themselves.',
+        ],
+        diagram: 'control-flow',
+      },
+      {
+        id: 'take-less-path',
+        title: 'Five is less than seven',
+        paragraphs: [
+          'After CMP, B.LT takes the less path and X2 becomes 1.',
+        ],
+        code: PROGRAMS.orderedBranch,
+        walkthrough: {
+          before: ['X0 = 5', 'X1 = 7', 'CMP has updated N, Z, C, V'],
+          execute: 'b.lt less',
+          after: ['Signed condition = true', 'PC points to less', 'X3 eventually becomes 1'],
+        },
+        callout: 'These names describe signed comparisons.',
+      },
+    ],
+    quiz: [{
+      id: 'ordered-path',
+      prompt: 'What is X3 after comparing signed 5 with 7?',
+      code: PROGRAMS.orderedBranch,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '1' },
+        { id: 'c', label: '5' },
+        { id: 'd', label: '7' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'B.LT is taken because signed 5 is less than signed 7.',
+    }],
+    labProgram: PROGRAMS.orderedBranch,
+    nextStep: 'Branches choose destinations. Next, BL also remembers where execution came from.',
+    visualFocus: ['registers', 'flags'],
+    flagFocus: ['N', 'Z', 'V'],
   },
   {
     id: 'function-calls',
-    order: 11,
-    title: 'Function Calls',
-    shortTitle: 'Functions',
-    description: 'Pass arguments, call with BL, observe LR, and return a result in X0.',
-    estimatedMinutes: 12,
-    prerequisites: ['branches', 'registers'],
+    order: 17,
+    title: 'BL and the Link Register',
+    shortTitle: 'BL & LR',
+    description: 'Watch BL jump and save the next instruction address in X30.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'BL branches to a target and records the return address in X30/LR.',
+    newConcepts: ['branch-with-link', 'link-register'],
+    buildsOn: ['unconditional-branch'],
+    prerequisites: ['unconditional-branches'],
+    registerFocus: ['x30', 'pc'],
+    visualPrompt: 'Show PC jumping from BL to foo while X30 receives the address of the instruction immediately after BL.',
     sections: [
       {
-        id: 'calling-convention',
-        title: 'Arguments and return values',
+        id: 'branch-and-remember',
+        title: 'One extra action',
         paragraphs: [
-          'A function is a reusable sequence of instructions. A call transfers control to it, and a return continues at the caller’s saved address.',
-          'A calling convention is the shared set of rules that tells callers and functions where to place arguments, results, and return information.',
-          'Under the common AArch64 calling convention, X0–X7 carry the first integer or pointer arguments. X0 carries an integer or pointer return value.',
-        ],
-        bullets: [
-          'X0 = first argument and return value',
-          'X1 = second argument',
-          'BL = call a labeled function',
-          'X30 / LR = return address',
-          'RET = continue at X30',
+          'BL means Branch with Link. Like B, it changes PC to a target. It also stores the address of the next instruction in X30.',
+          'X30 is also called LR, the Link Register.',
         ],
         diagram: 'function-call',
       },
       {
-        id: 'bl-and-ret',
-        title: 'BL saves where to return',
+        id: 'stop-before-return',
+        title: 'Call only—return comes next',
         paragraphs: [
-          'BL writes the address of the next instruction into X30, then changes PC to the function label. RET changes PC back to the address in X30.',
+          'This tiny program deliberately stops after foo\'s body. The call stack still contains foo because no return has happened yet.',
+          'Focus on the BL step: PC jumps to foo and X30 keeps the route back.',
         ],
-        code: `mov x0, 10
-mov x1, 20
-bl addnumbers
-b end
-
-addnumbers:
-    add x0, x0, x1
-    ret
-
-end:
-    mov x2, x0`,
-        callout: 'Step BL and RET slowly: X30 is the connection between caller and callee.',
+        code: PROGRAMS.linkRegister,
+        walkthrough: {
+          before: ['PC points to BL', 'X30 = 0'],
+          execute: 'bl foo',
+          after: ['PC points to foo', 'X30 = address of b end', 'foo is active but has not returned'],
+        },
+        callout: 'Use Step, not Run, and pause immediately after BL.',
       },
     ],
-    quiz: [
+    quiz: [{
+      id: 'bl-link-address',
+      prompt: 'What does BL store in X30?',
+      code: PROGRAMS.linkRegister,
+      options: [
+        { id: 'a', label: 'The address of the instruction after BL' },
+        { id: 'b', label: 'The value in X0' },
+        { id: 'c', label: 'The current SP value' },
+        { id: 'd', label: 'The first byte at foo' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'BL saves the next instruction address in X30/LR before jumping.',
+    }],
+    labProgram: PROGRAMS.linkRegister,
+    nextStep: 'X30 now holds a route back. Next, RET uses that saved address.',
+    visualFocus: ['calls'],
+  },
+  {
+    id: 'function-return',
+    order: 18,
+    title: 'Return with RET',
+    shortTitle: 'RET',
+    description: 'Use the address already stored in X30 to continue the caller.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'RET sends PC to the return address in X30/LR.',
+    newConcepts: ['return-instruction', 'call-roles'],
+    buildsOn: ['branch-with-link', 'link-register'],
+    prerequisites: ['function-calls'],
+    registerFocus: ['x0', 'x1', 'x30', 'pc'],
+    visualPrompt: 'Show the caller at _start, the called function foo, and RET moving PC from foo back to the instruction saved in LR.',
+    sections: [
       {
-        id: 'functions-return',
-        prompt: 'What value does addnumbers return in X0?',
-        code: `mov x0, 10
-mov x1, 20
-bl addnumbers
-b end
-
-addnumbers:
-add x0, x0, x1
-ret
-
-end:
-mov x2, x0`,
-        options: [
-          { id: 'a', label: '10' },
-          { id: 'b', label: '20' },
-          { id: 'c', label: '30' },
-          { id: 'd', label: 'The return address' },
+        id: 'caller-and-callee',
+        title: 'Two simple role names',
+        paragraphs: [
+          'The caller is the function making a call. The callee is the function being called.',
+          'RET copies the address in X30 into PC, so execution continues in the caller.',
         ],
-        correctOptionId: 'c',
-        explanation: 'The function adds its X0 and X1 arguments and leaves the result, 30, in the return-value register X0.',
+        diagram: 'function-call',
+      },
+      {
+        id: 'complete-round-trip',
+        title: 'Call, work, return',
+        paragraphs: [
+          'BL enters foo. RET later returns to the B instruction immediately after BL.',
+        ],
+        code: PROGRAMS.returnFlow,
+        walkthrough: {
+          before: ['Before BL: X30 = 0', 'After BL: X30 = address of b end'],
+          execute: 'ret',
+          after: ['PC = X30', 'Execution resumes at b end', 'X30 itself is unchanged'],
+        },
+        callout: 'Pause before RET and predict the next highlighted line.',
       },
     ],
-    labProgram: `mov x0, 10
-mov x1, 20
-bl addnumbers
-b end
-
-addnumbers:
-    add x0, x0, x1
-    ret
-
-end:
-    mov x2, x0`,
+    quiz: [{
+      id: 'ret-target',
+      prompt: 'Where does RET send execution?',
+      code: PROGRAMS.returnFlow,
+      options: [
+        { id: 'a', label: 'To the address in X30' },
+        { id: 'b', label: 'To the address in SP' },
+        { id: 'c', label: 'To foo again' },
+        { id: 'd', label: 'Always to address zero' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'RET changes PC to the saved return address in X30/LR.',
+    }],
+    labProgram: PROGRAMS.returnFlow,
+    nextStep: 'A function can return control. Next, pass values into it using an agreed register convention.',
+    visualFocus: ['calls'],
+  },
+  {
+    id: 'function-arguments',
+    order: 19,
+    title: 'Function Arguments',
+    shortTitle: 'Arguments',
+    description: 'Place input values where a called function expects to find them.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'A calling convention lets caller and callee agree that X0–X7 commonly carry arguments.',
+    newConcepts: ['calling-convention', 'argument-registers'],
+    buildsOn: ['call-roles', 'general-registers'],
+    prerequisites: ['function-return', 'registers'],
+    registerFocus: ['x0', 'x1', 'x2', 'x30', 'pc'],
+    visualPrompt: 'Show the caller placing 10 in X0 and 20 in X1, then carry those unchanged boxes across BL into the callee.',
+    sections: [
+      {
+        id: 'an-agreement',
+        title: 'Caller and callee agree',
+        paragraphs: [
+          'A calling convention is an agreement about where values go at a function-call boundary.',
+          'In the common AArch64 convention, X0–X7 commonly hold the first integer or pointer arguments. They remain general registers at other times.',
+        ],
+        diagram: 'function-call',
+      },
+      {
+        id: 'two-inputs',
+        title: 'Pass 10 and 20',
+        paragraphs: [
+          'The caller prepares X0 and X1 before BL. The callee reads those same registers.',
+        ],
+        code: PROGRAMS.arguments,
+        walkthrough: {
+          before: ['X0 = 10', 'X1 = 20', 'Caller is about to execute BL'],
+          execute: 'bl inspect',
+          after: ['Callee is active', 'X0 = 10 (argument 1)', 'X1 = 20 (argument 2)'],
+        },
+        callout: 'BL does not copy the arguments; both functions simply agree where to look.',
+      },
+    ],
+    quiz: [{
+      id: 'argument-registers',
+      prompt: 'Which registers carry the two inputs in this example?',
+      code: PROGRAMS.arguments,
+      options: [
+        { id: 'a', label: 'X0 and X1' },
+        { id: 'b', label: 'SP and PC' },
+        { id: 'c', label: 'X29 and X30' },
+        { id: 'd', label: 'Only X8' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'The caller places the first two values in X0 and X1 before BL.',
+    }],
+    labProgram: PROGRAMS.arguments,
+    nextStep: 'Arguments travel into a function. Next, bring one result back in X0.',
+    visualFocus: ['registers', 'calls'],
+  },
+  {
+    id: 'function-results',
+    order: 20,
+    title: 'Function Results',
+    shortTitle: 'Return Value',
+    description: 'Recognize X0 as the common place for one integer or pointer result.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'A callee commonly writes its result into X0 before RET.',
+    newConcepts: ['return-value-register'],
+    buildsOn: ['argument-registers', 'return-instruction'],
+    prerequisites: ['function-arguments'],
+    registerFocus: ['x0', 'x1', 'x2', 'x30', 'pc'],
+    visualPrompt: 'Show 10 and 20 entering in X0/X1, ADD replacing X0 with 30, and 30 remaining in X0 after RET.',
+    sections: [
+      {
+        id: 'same-register-new-role',
+        title: 'X0 carries the answer back',
+        paragraphs: [
+          'The common convention uses X0 for the first argument and also for one integer or pointer return value.',
+          'X0 is not permanently a result register. Its role comes from where execution is relative to the call.',
+        ],
+        diagram: 'function-call',
+      },
+      {
+        id: 'return-thirty',
+        title: 'Follow addnumbers',
+        paragraphs: [
+          'Inside addnumbers, ADD replaces X0 with 30. RET changes control flow but leaves that result in X0.',
+        ],
+        code: PROGRAMS.results,
+        walkthrough: {
+          before: ['At callee entry: X0 = 10', 'X1 = 20'],
+          execute: 'add x0, x0, x1; then ret',
+          after: ['X0 = 30', 'Caller is active again', 'Caller copies 30 into X2'],
+        },
+        callout: 'X30 carries the return address; X0 carries the returned value.',
+      },
+    ],
+    quiz: [{
+      id: 'result-register',
+      prompt: 'What value is in X0 immediately before RET?',
+      code: PROGRAMS.results,
+      options: [
+        { id: 'a', label: '10' },
+        { id: 'b', label: '20' },
+        { id: 'c', label: '30' },
+        { id: 'd', label: 'The return address' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'ADD writes 10 + 20 into X0, the common result register.',
+    }],
+    labProgram: PROGRAMS.results,
+    nextStep: 'One call uses one return address. Next, see what a second BL does to X30.',
+    visualFocus: ['registers', 'calls'],
+  },
+  {
+    id: 'saving-return-address',
+    order: 21,
+    title: 'Saving the Return Address',
+    shortTitle: 'Save LR',
+    description: 'Protect an older X30 value before a function executes another BL.',
+    estimatedMinutes: 8,
+    kind: 'concept',
+    coreIdea: 'A function that makes another call must preserve the return address it still needs.',
+    newConcepts: ['saved-link-register'],
+    buildsOn: ['stack-local', 'link-register', 'branch-with-link', 'return-instruction'],
+    prerequisites: ['stack-values', 'function-return'],
+    registerFocus: ['x0', 'x1', 'x30', 'sp', 'pc'],
+    visualPrompt: 'Show X30 holding foo\'s return address, BL bar overwriting it, and one stack slot restoring the older value before RET.',
+    sections: [
+      {
+        id: 'second-bl-overwrites-lr',
+        title: 'The problem: one X30, two calls',
+        paragraphs: [
+          '_start calls foo, so X30 holds foo\'s route back. When foo calls bar, BL writes bar\'s return address into the same X30.',
+          'Without a saved copy, foo loses the address it needs for its own RET.',
+        ],
+        diagram: 'lr-overwrite',
+      },
+      {
+        id: 'save-call-restore',
+        title: 'Use instructions you already know',
+        paragraphs: [
+          'Allocate one stack slot, STR X30, call bar, LDR the old X30, restore SP, then RET.',
+          'X29, STP, and compact indexed syntax are deliberately absent.',
+        ],
+        code: PROGRAMS.saveLink,
+        walkthrough: {
+          before: ['X30 = foo\'s return address', 'SP points to unallocated space'],
+          execute: 'save X30; BL bar; restore X30; RET',
+          after: ['bar returned to foo', 'foo restored its older X30', 'foo returned to _start'],
+        },
+        callout: 'Name the four stages aloud: save → call → restore → return.',
+      },
+    ],
+    quiz: [{
+      id: 'why-save-link',
+      prompt: 'Why does foo save X30 before BL bar?',
+      code: PROGRAMS.saveLink,
+      options: [
+        { id: 'a', label: 'BL bar will overwrite X30' },
+        { id: 'b', label: 'STR always clears X30' },
+        { id: 'c', label: 'RET reads only X0' },
+        { id: 'd', label: 'SP cannot hold addresses' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'Every BL writes a new return address into X30, so foo must preserve its older one.',
+    }],
+    labProgram: PROGRAMS.saveLink,
+    nextStep: 'You can save one register manually. Next, save or load two neighboring registers together.',
+    visualFocus: ['stack', 'calls'],
+  },
+  {
+    id: 'load-store-pair',
+    order: 22,
+    title: 'Store Pair and Load Pair',
+    shortTitle: 'STP & LDP',
+    description: 'Replace two neighboring stores or loads with one paired instruction.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'STP and LDP perform two adjacent eight-byte memory transfers.',
+    newConcepts: ['pair-load-store'],
+    buildsOn: ['str', 'ldr', 'memory-offset'],
+    prerequisites: ['saving-return-address', 'memory-offsets'],
+    registerFocus: ['x29', 'x30', 'sp'],
+    visualPrompt: 'Begin with two separate STR arrows into SP and SP+8, then merge them into one STP arrow; reverse for LDP.',
+    sections: [
+      {
+        id: 'why-a-pair',
+        title: 'We want to save two registers',
+        paragraphs: [
+          'Two familiar stores could write X29 at SP and X30 at SP + 8. ARM64 provides STP—Store Pair—for that same neighboring layout.',
+          'For now, X29 is simply one of two values. Its common Frame Pointer role comes later.',
+        ],
+        diagram: 'register-pair',
+      },
+      {
+        id: 'simple-pair-first',
+        title: 'Use the simple [sp] form',
+        paragraphs: [
+          'stp x29, x30, [sp] stores both values without changing SP. ldp x29, x30, [sp] loads them back and also leaves SP unchanged.',
+        ],
+        code: PROGRAMS.pair,
+        walkthrough: {
+          before: ['X29 = 0x1111', 'X30 = 0x2222', 'SP already has 16 allocated bytes'],
+          execute: 'stp x29, x30, [sp]; later ldp x29, x30, [sp]',
+          after: ['memory[SP] = 0x1111', 'memory[SP + 8] = 0x2222', 'LDP restores both registers'],
+        },
+        callout: 'Pair transfer first. SP writeback is a separate lesson.',
+      },
+    ],
+    quiz: [{
+      id: 'pair-second-slot',
+      prompt: 'Where does the simple STP store X30?',
+      code: PROGRAMS.pair,
+      options: [
+        { id: 'a', label: 'memory[SP]' },
+        { id: 'b', label: 'memory[SP + 8]' },
+        { id: 'c', label: 'memory[SP + 16]' },
+        { id: 'd', label: 'It does not store X30' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'Each X register is eight bytes, so the second register uses the next slot at SP + 8.',
+    }],
+    labProgram: PROGRAMS.pair,
+    nextStep: 'STP and LDP now mean only store two and load two. Next, combine them with an SP update.',
+    visualFocus: ['stack'],
+  },
+  {
+    id: 'indexed-addressing',
+    order: 23,
+    title: 'Pre-index and Post-index',
+    shortTitle: 'Indexed Addressing',
+    description: 'Combine a familiar SP update with a paired memory operation.',
+    estimatedMinutes: 8,
+    kind: 'concept',
+    coreIdea: 'Indexed writeback changes the base register before or after the memory transfer.',
+    newConcepts: ['indexed-writeback'],
+    buildsOn: ['pair-load-store', 'stack-growth'],
+    prerequisites: ['load-store-pair', 'stack'],
+    registerFocus: ['x29', 'x30', 'sp'],
+    visualPrompt: 'Animate numbered phases: pre-index moves SP then stores; post-index loads first then moves SP.',
+    sections: [
+      {
+        id: 'expanded-before-compact',
+        title: 'Start from the expanded operations',
+        paragraphs: [
+          'You already understand SUB SP followed by STP [SP]. The compact form stp x29, x30, [sp, #-16]! performs that same update-before-store pattern.',
+          'The exclamation mark requests writeback: the calculated address is written back into SP.',
+        ],
+        diagram: 'indexed-addressing',
+      },
+      {
+        id: 'before-versus-after',
+        title: 'Pre before, post after',
+        paragraphs: [
+          'Pre-indexed STP lowers SP before storing. Post-indexed LDP loads from the old SP before adding 16.',
+        ],
+        code: PROGRAMS.indexed,
+        walkthrough: {
+          before: ['SP = 0x...E000', 'X29 = 0x1111', 'X30 = 0x2222'],
+          execute: 'STP pre-index; later LDP post-index',
+          after: ['STP: SP lowers, then two values appear', 'LDP: two values load, then SP rises', 'Final SP = starting SP'],
+        },
+        callout: 'Pre-index: update then access. Post-index: access then update.',
+      },
+    ],
+    quiz: [{
+      id: 'post-index-order',
+      prompt: 'When does post-indexed LDP add 16 to SP?',
+      code: PROGRAMS.indexed,
+      options: [
+        { id: 'a', label: 'Before loading either register' },
+        { id: 'b', label: 'After loading both registers' },
+        { id: 'c', label: 'Only after RET' },
+        { id: 'd', label: 'It never changes SP' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'Post-index uses the old address for the loads, then writes the updated address into SP.',
+    }],
+    labProgram: PROGRAMS.indexed,
+    nextStep: 'SP can move compactly. Next, give a function one stable stack reference.',
+    visualFocus: ['stack'],
+  },
+  {
+    id: 'frame-pointer',
+    order: 24,
+    title: 'X29 and the Frame Pointer',
+    shortTitle: 'Frame Pointer',
+    description: 'Keep a stable reference while SP moves inside a function.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'X29/FP can anchor the current function\'s stack area even when SP changes.',
+    newConcepts: ['frame-pointer'],
+    buildsOn: ['stack-pointer', 'stack-growth'],
+    prerequisites: ['stack', 'indexed-addressing'],
+    registerFocus: ['x0', 'x29', 'sp'],
+    visualPrompt: 'Show SP and X29 pointing to the same frame address, then move only SP lower while X29 remains anchored.',
+    sections: [
+      {
+        id: 'sp-can-move',
+        title: 'The problem: SP is allowed to move',
+        paragraphs: [
+          'A function\'s active stack area is often called its stack frame. If SP moves again, one location may be harder to describe consistently.',
+          'X29 is commonly used as FP—the Frame Pointer—to keep a stable reference. Optimized functions do not always use it.',
+        ],
+        diagram: 'frame-pointer',
+      },
+      {
+        id: 'copy-then-move',
+        title: 'Anchor the current address',
+        paragraphs: [
+          'mov x29, sp copies the current address. Later arithmetic changes SP only.',
+        ],
+        code: PROGRAMS.framePointer,
+        walkthrough: {
+          before: ['SP points to the 32-byte frame area', 'X29 has its older value'],
+          execute: 'mov x29, sp; then sub sp, sp, #16',
+          after: ['X29 still points to the frame address', 'SP is 16 bytes lower'],
+        },
+        callout: 'X29 does not track SP automatically; MOV captured one value.',
+      },
+    ],
+    quiz: [{
+      id: 'fp-stays-stable',
+      prompt: 'What happens to X29 when a later SUB changes SP?',
+      code: PROGRAMS.framePointer,
+      options: [
+        { id: 'a', label: 'X29 also moves automatically' },
+        { id: 'b', label: 'X29 remains at the copied address' },
+        { id: 'c', label: 'X29 becomes zero' },
+        { id: 'd', label: 'X29 becomes the return address' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'MOV copied one SP value. Later SP changes do not alter X29.',
+    }],
+    labProgram: PROGRAMS.framePointer,
+    nextStep: 'Every individual piece is now familiar. Next, combine them into one conventional frame.',
+    visualFocus: ['stack'],
+  },
+  {
+    id: 'stack-frames',
+    order: 25,
+    title: 'Putting a Stack Frame Together',
+    shortTitle: 'Stack Frame',
+    description: 'Combine known operations into a conventional function setup and cleanup pattern.',
+    estimatedMinutes: 8,
+    kind: 'integration',
+    coreIdea: 'A conventional frame is the familiar save, anchor, work, restore, return sequence.',
+    newConcepts: [],
+    buildsOn: ['saved-link-register', 'pair-load-store', 'indexed-writeback', 'frame-pointer', 'return-instruction'],
+    prerequisites: ['frame-pointer', 'indexed-addressing', 'saving-return-address'],
+    registerFocus: ['x0', 'x29', 'x30', 'sp', 'pc'],
+    visualPrompt: 'Group the function into setup, body, and cleanup; reuse the exact visuals already learned for each group.',
+    sections: [
+      {
+        id: 'known-pieces',
+        title: 'Nothing operationally new',
+        paragraphs: [
+          'A prologue is setup code at a function\'s beginning. An epilogue is cleanup code before RET.',
+          'Here the prologue saves X29/X30 and anchors X29. The body writes 42. The epilogue restores the pair and SP before RET.',
+        ],
+        diagram: 'stack-frame',
+      },
+      {
+        id: 'three-groups',
+        title: 'Read three groups, not seven lines',
+        paragraphs: [
+          'Say setup, body, or cleanup before each Step. Every instruction has already appeared in an earlier lesson.',
+        ],
+        code: PROGRAMS.frame,
+        walkthrough: {
+          before: ['Caller has placed a return address in X30', 'SP is at its aligned boundary'],
+          execute: 'STP + MOV; body; LDP + RET',
+          after: ['X0 = 42', 'X29 and X30 restored', 'SP restored', 'Caller resumes'],
+        },
+        callout: 'This is a common convention, not a requirement for every optimized function.',
+      },
+    ],
+    quiz: [{
+      id: 'frame-ret-needs-lr',
+      prompt: 'Why does the cleanup restore X30 before RET?',
+      code: PROGRAMS.frame,
+      options: [
+        { id: 'a', label: 'RET needs the caller\'s saved return address' },
+        { id: 'b', label: 'X30 contains the function result' },
+        { id: 'c', label: 'LDP requires X30 to be zero' },
+        { id: 'd', label: 'SP is stored inside X30' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'The saved X30 is the route back to the caller, and RET uses it.',
+    }],
+    labProgram: PROGRAMS.frame,
+    nextStep: 'The complete frame is familiar. Next, trace it while two calls are active.',
+    visualFocus: ['stack', 'calls'],
   },
   {
     id: 'nested-function-calls',
-    order: 12,
-    title: 'Nested Function Calls',
+    order: 26,
+    title: 'Nested Calls with a Frame',
     shortTitle: 'Nested Calls',
-    description: 'See why a function must preserve its incoming link register before it calls another function.',
-    estimatedMinutes: 13,
-    prerequisites: ['function-calls', 'stack-frames'],
+    description: 'Trace _start → foo → bar while the older return address stays safe.',
+    estimatedMinutes: 8,
+    kind: 'integration',
+    coreIdea: 'A saved frame lets each active call preserve the state it will need later.',
+    newConcepts: [],
+    buildsOn: ['saved-link-register', 'indexed-writeback', 'frame-pointer', 'return-value-register'],
+    prerequisites: ['stack-frames', 'function-results'],
+    registerFocus: ['x0', 'x29', 'x30', 'sp', 'pc'],
+    visualPrompt: 'Show the call stack growing _start→foo→bar while one saved LR remains on the memory stack, then unwind in reverse.',
     sections: [
       {
-        id: 'lr-overwrite',
-        title: 'Every BL writes X30',
+        id: 'connect-two-stacks',
+        title: 'Call depth and saved memory',
         paragraphs: [
-          '_start calls foo, so X30 initially points back into _start. When foo calls bar, BL bar replaces X30 with a return address inside foo.',
-          'Without saving the first return address, foo would no longer know how to return to _start.',
+          'The call-stack diagram shows which functions are active. The memory stack holds foo\'s saved X29 and X30.',
+          'These are two views of the same execution story, not two separate CPU states.',
         ],
         diagram: 'nested-calls',
       },
       {
-        id: 'save-before-nesting',
-        title: 'Preserve the caller link',
+        id: 'grow-and-unwind',
+        title: 'Watch the whole sequence',
         paragraphs: [
-          'foo saves X30 with X29 on the stack before BL bar. Its epilogue restores the original X30 before RET.',
+          'foo saves its return state, bar adds 10, then bar and foo return in reverse order.',
         ],
-        code: `_start:
-    mov x0, 5
-    bl foo
-    b end
-
-foo:
-    stp x29, x30, [sp, #-16]!
-    mov x29, sp
-    bl bar
-    ldp x29, x30, [sp], #16
-    ret
-
-bar:
-    add x0, x0, #10
-    ret
-
-end:
-    mov x1, x0`,
-        callout: 'Watch Function Calls, Stack, X30 / LR, SP, and PC together.',
+        code: PROGRAMS.nested,
+        walkthrough: {
+          before: ['X0 = 5', 'Only _start is active'],
+          execute: 'BL foo; save frame; BL bar; return twice',
+          after: ['X0 = 15', 'X1 = 15', 'SP and saved registers restored'],
+        },
+        callout: 'Pause at each BL and RET. Name which function is caller and which is callee.',
       },
     ],
-    quiz: [
-      {
-        id: 'nested-why-save-lr',
-        prompt: 'Why does foo save X30 before executing BL bar?',
-        options: [
-          { id: 'a', label: 'BL bar will overwrite X30' },
-          { id: 'b', label: 'ADD requires X30 to be zero' },
-          { id: 'c', label: 'SP cannot hold an address' },
-          { id: 'd', label: 'X0 must contain the return address' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'Every BL writes a new return address to X30, so foo must preserve the address it needs when it later returns to _start.',
-      },
-    ],
-    labProgram: `_start:
-    mov x0, 5
-    bl foo
-    b end
-
-foo:
-    stp x29, x30, [sp, #-16]!
-    mov x29, sp
-    bl bar
-    ldp x29, x30, [sp], #16
-    ret
-
-bar:
-    add x0, x0, #10
-    ret
-
-end:
-    mov x1, x0`,
+    quiz: [{
+      id: 'nested-final-value',
+      prompt: 'What value reaches X1 at the end?',
+      code: PROGRAMS.nested,
+      options: [
+        { id: 'a', label: '5' },
+        { id: 'b', label: '10' },
+        { id: 'c', label: '15' },
+        { id: 'd', label: 'The saved X30 address' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'bar adds 10 to the input 5, then the preserved return path reaches end with X0 = 15.',
+    }],
+    labProgram: PROGRAMS.nested,
+    nextStep: 'Functions explain executable code. Next, separate executable instructions from stored data.',
+    visualFocus: ['stack', 'calls'],
   },
   {
     id: 'data-sections-strings',
-    order: 13,
-    title: 'Data Sections and Strings',
-    shortTitle: 'Data & Strings',
-    description: 'Define labeled bytes separately from executable text and load their stable addresses.',
-    estimatedMinutes: 10,
+    order: 27,
+    title: 'Code and Data Sections',
+    shortTitle: 'Sections',
+    description: 'Separate bytes meant to be stored from instructions meant to execute.',
+    estimatedMinutes: 6,
+    kind: 'concept',
+    coreIdea: 'Section directives select whether following source describes data or executable code.',
+    newConcepts: ['source-sections', 'assembler-directive'],
+    buildsOn: ['cpu-state', 'memory-address'],
     prerequisites: ['addresses-pointers'],
+    registerFocus: ['x0', 'pc'],
+    visualPrompt: 'Draw separate .data and .text regions; keep PC inside .text and show directives consuming no instruction slot.',
     sections: [
       {
-        id: 'sections',
-        title: 'Separate data from code',
+        id: 'two-purposes',
+        title: 'Stored bytes versus instructions',
         paragraphs: [
-          'A section groups bytes with the same purpose. .data or .section .data selects stored data, while .text or .section .text selects executable instructions.',
-          'A label gives a readable name to an address. Data labels name byte addresses; text labels name instruction addresses. .globl declares a linker-visible name and is accepted by A64 Lab without changing execution.',
+          '.data or .section .data selects stored data. .text or .section .text selects executable instructions.',
+          'A line beginning with a dot is an assembler directive: it describes source layout and does not execute.',
         ],
+        diagram: 'code-sections',
       },
       {
-        id: 'string-directives',
-        title: 'ASCII bytes and terminators',
+        id: 'no-pc-slot',
+        title: 'Directives do not become instructions',
         paragraphs: [
-          'ASCII is a character encoding that represents letters and symbols with numeric byte values. A NULL terminator is a zero byte used to mark the end of many C strings.',
-          '.asciz stores the text bytes and appends a NULL byte. .ascii stores only the text bytes.',
+          'The first real instruction remains MOV. Section directives consume no PC address.',
+          '.globl and .global mark a symbol for linking. A64 Lab accepts them, but their linker role does not change simulation.',
         ],
-        bullets: [
-          '.asciz "ARM64\\n" → 41 52 4d 36 34 0a 00',
-          '.ascii "ARM64\\n" → 41 52 4d 36 34 0a',
+        code: PROGRAMS.sections,
+        callout: 'Reset and notice that only MOV becomes the current instruction.',
+      },
+    ],
+    quiz: [{
+      id: 'section-executes',
+      prompt: 'Which line executes on the CPU?',
+      code: PROGRAMS.sections,
+      options: [
+        { id: 'a', label: '.section .data' },
+        { id: 'b', label: '.section .text' },
+        { id: 'c', label: '_start:' },
+        { id: 'd', label: 'mov x0, 1' },
+      ],
+      correctOptionId: 'd',
+      explanation: 'Directives and labels describe layout. MOV is the executable instruction.',
+    }],
+    labProgram: PROGRAMS.sections,
+    nextStep: 'The data region is ready. Next, place readable character bytes inside it.',
+    visualFocus: ['registers'],
+  },
+  {
+    id: 'string-data',
+    order: 28,
+    title: 'Strings Are Bytes',
+    shortTitle: 'String Bytes',
+    description: 'See how .ascii and .asciz turn quoted characters into bytes in the data region.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'A string in assembly is a sequence of character bytes stored in memory.',
+    newConcepts: ['string-bytes', 'null-terminated-string'],
+    buildsOn: ['source-sections', 'memory-address', 'little-endian'],
+    prerequisites: ['data-sections-strings', 'little-endian'],
+    registerFocus: ['x0', 'pc'],
+    visualPrompt: 'Show each character becoming one byte, then add a separate 00 cell only for the .asciz definition.',
+    sections: [
+      {
+        id: 'characters-become-bytes',
+        title: 'Readable text still lives as numbers',
+        paragraphs: [
+          'You already know the .data section holds stored bytes. The .ascii directive converts each quoted character into its byte value.',
+          'For example, A becomes 0x41. An escape such as \\n becomes the newline byte 0x0A rather than two visible characters.',
         ],
         diagram: 'data-bytes',
       },
       {
-        id: 'labeled-data',
-        title: 'Load a data address',
+        id: 'ascii-versus-asciz',
+        title: 'Choose whether to append zero',
         paragraphs: [
-          'The label identifies the first byte. LDR with =message places that address in a register without reading the bytes yet.',
+          '.ascii stores only the character bytes. .asciz stores the same bytes and appends a NULL byte, 0x00.',
+          'A NULL terminator is a zero byte used by many string-reading conventions to mark the end. It is stored data, not an instruction.',
         ],
-        code: `.section .data
-message:
-    .asciz "ARM64\\n"
-raw:
-    .ascii "RAW"
-
-.section .text
-.globl _start
-_start:
-    ldr x1, =message
-    ldr x2, =raw`,
+        code: PROGRAMS.strings,
+        walkthrough: {
+          before: ['The .data region has no bytes from this source yet'],
+          execute: 'Load the program and let the assembler initialize .data',
+          after: ['raw = 41 52 4D 36 34', 'message = 68 65 6C 6C 6F 0A 00', 'PC still begins at the MOV in .text'],
+        },
+        callout: '.asciz adds one final 00 byte. .ascii does not.',
       },
     ],
-    quiz: [
+    quiz: [{
+      id: 'asciz-final-byte',
+      prompt: 'Which bytes does .asciz "A" store?',
+      code: asm('.data', 'letter:', '    .asciz "A"', '.text', '_start:', '    mov x0, 0'),
+      options: [
+        { id: 'a', label: '41' },
+        { id: 'b', label: '41 00' },
+        { id: 'c', label: '00 41' },
+        { id: 'd', label: '41 0A' },
+      ],
+      correctOptionId: 'b',
+      explanation: 'ASCII A is 0x41, and .asciz appends one NULL byte, 0x00.',
+    }],
+    labProgram: PROGRAMS.strings,
+    nextStep: 'The bytes now exist in memory. Next, give those bytes a name and load their address.',
+    visualFocus: ['memory'],
+  },
+  {
+    id: 'loading-addresses',
+    order: 29,
+    title: 'Labels Name Data Addresses',
+    shortTitle: 'Load an Address',
+    description: 'Use a data label and ldr xN, =label to place a stable address in a register.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'A data label names an address, and the =label pseudo-instruction loads that address without reading its contents.',
+    newConcepts: ['data-label', 'address-pseudo-load'],
+    buildsOn: ['string-bytes', 'pointer', 'ldr', 'code-label'],
+    prerequisites: ['string-data', 'memory-ldr-str'],
+    registerFocus: ['x1', 'pc'],
+    visualPrompt: 'Show message attached to 0x00400000, then copy only that address into X1 and draw X1 pointing back to the bytes.',
+    sections: [
       {
-        id: 'data-terminator',
-        prompt: 'How many bytes does this directive allocate?',
-        code: `.data
-message:
-.asciz "ABC"`,
-        options: [
-          { id: 'a', label: '2 bytes' },
-          { id: 'b', label: '3 bytes' },
-          { id: 'c', label: '4 bytes' },
-          { id: 'd', label: '8 bytes' },
+        id: 'name-a-location',
+        title: 'A label saves you from memorizing an address',
+        paragraphs: [
+          'You already used code labels as branch destinations. In .data, a label names the address of the bytes that follow it.',
+          'The assembler assigns message a deterministic address. The label is a name for that location; it is not another copy of the string.',
         ],
-        correctOptionId: 'c',
-        explanation: '.asciz stores the three ASCII bytes and appends one NULL byte, for four bytes total.',
+        diagram: 'pointer',
+      },
+      {
+        id: 'address-not-contents',
+        title: 'Load the address, not the bytes',
+        paragraphs: [
+          'A pseudo-instruction is assembler shorthand for a useful operation. The common ldr x1, =message form means X1 = address of message in A64 Lab.',
+          'This differs from ldr x1, [x2], which dereferences X2 and reads eight bytes from memory.',
+        ],
+        code: PROGRAMS.labelAddress,
+        walkthrough: {
+          before: ['message is stored at 0x00400000', 'X1 = 0'],
+          execute: 'ldr x1, =message',
+          after: ['X1 = 0x00400000', 'The bytes at message are unchanged', 'X1 now acts as a pointer'],
+        },
+        callout: '=message obtains an address. [x2] reads memory.',
       },
     ],
-    labProgram: `.section .data
-message:
-    .asciz "ARM64\\n"
-raw:
-    .ascii "RAW"
-
-.section .text
-.globl _start
-_start:
-    ldr x1, =message
-    ldr x2, =raw`,
+    quiz: [{
+      id: 'label-address-result',
+      prompt: 'What does X1 contain after the final instruction?',
+      code: PROGRAMS.labelAddress,
+      options: [
+        { id: 'a', label: 'The address assigned to message' },
+        { id: 'b', label: 'The first eight string bytes as a number' },
+        { id: 'c', label: 'The length of hello' },
+        { id: 'd', label: 'A pointer to the stack' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'The =message form loads the label\'s address. It does not dereference that address.',
+    }],
+    labProgram: PROGRAMS.labelAddress,
+    nextStep: 'You can prepare values and pointers in registers. Next, learn what makes a Linux service request actually happen.',
+    visualFocus: ['registers', 'pointers'],
+  },
+  {
+    id: 'syscall-gate',
+    order: 30,
+    title: 'SVC: Request a Linux Service',
+    shortTitle: 'SVC Gate',
+    description: 'Prepare a Linux AArch64 service number, then use SVC 0 to make the request.',
+    estimatedMinutes: 7,
+    kind: 'concept',
+    coreIdea: 'Register setup only prepares a Linux syscall; SVC 0 is the instruction that requests it.',
+    newConcepts: ['linux-syscall-registers', 'supervisor-call'],
+    buildsOn: ['general-registers', 'immediate-operand'],
+    prerequisites: ['mov-arithmetic'],
+    registerFocus: ['x0', 'x8', 'pc'],
+    visualPrompt: 'Keep X0 and X8 visible, show preparation ending at a closed gate, then open the gate only when SVC 0 executes.',
+    sections: [
+      {
+        id: 'prepare-then-request',
+        title: 'Registers describe the request',
+        paragraphs: [
+          'A syscall is a program request for an operating-system service. In the simplified Linux AArch64 convention used here, X8 selects the service and X0–X5 can carry arguments.',
+          'These register roles are Linux AArch64 conventions, not universal rules for Android, macOS, or every operating system.',
+        ],
+        diagram: 'syscall-gate',
+      },
+      {
+        id: 'exit-at-the-gate',
+        title: 'SVC performs the prepared request',
+        paragraphs: [
+          'Service 93 is exit. X0 supplies the status. MOV only prepares those values; execution ends when SVC 0 requests the service.',
+        ],
+        code: PROGRAMS.exit,
+        walkthrough: {
+          before: ['X0 = 0 (desired exit status)', 'X8 = 93 (Linux AArch64 exit)', 'Program is still running'],
+          execute: 'svc 0',
+          after: ['Program is halted cleanly', 'Exit status = 0', 'Terminal output is still empty'],
+        },
+        callout: 'SVC is the gate. Loading a number into X8 alone performs no service.',
+      },
+    ],
+    quiz: [{
+      id: 'svc-triggers-request',
+      prompt: 'Which instruction actually requests the prepared Linux service?',
+      code: PROGRAMS.exit,
+      options: [
+        { id: 'a', label: 'mov x0, 0' },
+        { id: 'b', label: 'mov x8, 93' },
+        { id: 'c', label: 'svc 0' },
+        { id: 'd', label: '_start:' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'The MOV instructions prepare arguments and a service number. SVC 0 makes the request.',
+    }],
+    labProgram: PROGRAMS.exit,
+    nextStep: 'You can now cross the syscall gate. Next, use the same mechanism to write known bytes to stdout.',
+    visualFocus: ['registers', 'terminal'],
   },
   {
     id: 'linux-syscalls',
-    order: 14,
-    title: 'Linux AArch64 Syscalls',
-    shortTitle: 'Syscalls',
-    description: 'Use the simulator’s simplified Linux AArch64 write and exit system calls.',
-    estimatedMinutes: 12,
-    prerequisites: ['data-sections-strings', 'registers'],
+    order: 31,
+    title: 'Linux write()',
+    shortTitle: 'write() Syscall',
+    description: 'Apply the syscall register pattern to copy an exact number of memory bytes to stdout.',
+    estimatedMinutes: 9,
+    kind: 'concept',
+    coreIdea: 'Linux write reads exactly X2 bytes from the buffer address in X1 and sends them to the destination selected by X0.',
+    newConcepts: ['linux-write-syscall'],
+    buildsOn: ['linux-syscall-registers', 'supervisor-call', 'address-pseudo-load', 'string-bytes'],
+    prerequisites: ['syscall-gate', 'loading-addresses'],
+    registerFocus: ['x0', 'x1', 'x2', 'x8'],
+    visualPrompt: 'Show X0, X1, X2, and X8 as four inputs to write, then animate exactly six bytes from message into the terminal.',
     sections: [
       {
-        id: 'linux-convention',
-        title: 'Linux AArch64 convention',
+        id: 'four-write-inputs',
+        title: 'Describe one write request',
         paragraphs: [
-          'A system call is a program’s request for an operating-system service, such as writing output or ending a process.',
-          'In the Linux AArch64 syscall convention, X0–X5 hold syscall arguments, X8 selects the service by number, and SVC 0 performs the request.',
-          'These numbers are Linux AArch64 values; syscall numbers are not universal across operating systems or architectures.',
-        ],
-        bullets: [
-          'X8 = 64 → write',
-          'X8 = 93 → exit',
+          'You already know X8 selects a service and SVC requests it. Linux AArch64 write uses service 64.',
+          'X0 = 1 selects standard output, usually called stdout. X1 points to the buffer—the memory bytes to send. X2 gives the exact byte count.',
         ],
         diagram: 'syscall',
       },
       {
-        id: 'write-arguments',
-        title: 'Write to stdout',
+        id: 'printing-needs-svc',
+        title: 'A stored string does not print itself',
         paragraphs: [
-          'For write, X0 is the file descriptor, X1 is the buffer address, and X2 is the exact byte count. File descriptor 1 means stdout.',
+          'Defining message stores bytes. Loading =message produces a pointer. Neither action prints anything.',
+          'When SVC executes with X8 = 64, the simulator reads exactly X2 bytes. write does not depend on the NULL terminator.',
         ],
-        bullets: [
-          'X0 = 1 → stdout',
-          'X1 = address of message',
-          'X2 = 6 → number of bytes',
-          'X8 = 64 → write',
-        ],
-      },
-      {
-        id: 'hello-syscall',
-        title: 'Write, then exit',
-        paragraphs: [
-          'Step through SVC 0 to append hello and a newline to the terminal. The second SVC exits cleanly with status 0.',
-        ],
-        code: `.section .data
-message:
-    .asciz "hello\\n"
-
-.section .text
-.globl _start
-_start:
-    mov x0, 1
-    ldr x1, =message
-    mov x2, 6
-    mov x8, 64
-    svc 0
-
-    mov x0, 0
-    mov x8, 93
-    svc 0`,
-        callout: 'With X8 = 64, SVC 0 means write(fd=X0, buffer=X1, size=X2).',
+        code: PROGRAMS.write,
+        walkthrough: {
+          before: ['X0 = 1', 'X1 = address of message', 'X2 = 6', 'X8 = 64', 'Terminal is empty'],
+          execute: 'svc 0',
+          after: ['Six bytes reach stdout: h e l l o newline', 'The trailing NULL is not written', 'The later exit request ends with status 0'],
+        },
+        callout: 'The byte count controls output: X2 = 6 writes hello plus newline, not the trailing 00.',
       },
     ],
-    quiz: [
-      {
-        id: 'syscalls-size',
-        prompt: 'Which register tells Linux write how many bytes to read from the buffer?',
-        options: [
-          { id: 'a', label: 'X0' },
-          { id: 'b', label: 'X1' },
-          { id: 'c', label: 'X2' },
-          { id: 'd', label: 'X8' },
-        ],
-        correctOptionId: 'c',
-        explanation: 'For write, X2 is the byte count. The call reads exactly that many bytes and does not depend on NULL termination.',
-      },
-    ],
-    labProgram: `.section .data
-message:
-    .asciz "hello\\n"
-
-.section .text
-.globl _start
-_start:
-    mov x0, 1
-    ldr x1, =message
-    mov x2, 6
-    mov x8, 64
-    svc 0
-
-    mov x0, 0
-    mov x8, 93
-    svc 0`,
+    quiz: [{
+      id: 'write-byte-count',
+      prompt: 'Why does this program set X2 to 6?',
+      code: PROGRAMS.write,
+      options: [
+        { id: 'a', label: 'hello plus newline contains six bytes' },
+        { id: 'b', label: 'X2 must always equal the syscall number' },
+        { id: 'c', label: 'The NULL byte must always be printed' },
+        { id: 'd', label: 'stdout is file descriptor 6' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'write reads exactly X2 bytes. Five letters plus one newline byte gives a size of six.',
+    }],
+    labProgram: PROGRAMS.write,
+    nextStep: 'You can now build and run small programs. Next, learn to group unfamiliar disassembly into familiar patterns.',
+    visualFocus: ['registers', 'terminal'],
   },
   {
     id: 'reading-disassembly',
-    order: 15,
-    title: 'Reading Disassembly',
+    order: 32,
+    title: 'Read Disassembly in Patterns',
     shortTitle: 'Disassembly',
-    description: 'Turn a familiar prologue, body, and epilogue into simple pseudocode.',
-    estimatedMinutes: 12,
-    prerequisites: ['stack-frames', 'function-calls'],
+    description: 'Turn a real-looking instruction listing into familiar setup, work, and cleanup groups.',
+    estimatedMinutes: 9,
+    kind: 'concept',
+    coreIdea: 'Read disassembly by recognizing small familiar patterns instead of decoding every line in isolation.',
+    newConcepts: ['disassembly-pattern-reading'],
+    buildsOn: ['pair-load-store', 'indexed-writeback', 'frame-pointer', 'stack-local', 'return-value-register'],
+    prerequisites: ['stack-frames', 'function-results'],
+    registerFocus: ['x0', 'x29', 'x30', 'sp', 'pc'],
+    visualPrompt: 'Place the listing into three colored groups named setup, body, and cleanup, with arrows showing the same known state transitions.',
     sections: [
       {
-        id: 'recognize-shape',
-        title: 'Read patterns, not isolated lines',
+        id: 'group-before-decoding',
+        title: 'Find the shape first',
         paragraphs: [
-          'Disassembly is readable assembly produced by decoding a binary’s machine-code bytes.',
-          'A function prologue prepares its stack frame and saves needed state; an epilogue restores that state and returns. Locate those boundaries first, then track arguments, stack slots, loads, stores, and the return-value register.',
-          'Actual compiler output varies with compiler, options, optimization, and surrounding code.',
+          'Machine code is the encoded instruction bytes a CPU executes. Disassembly turns those bytes back into a readable instruction listing, often without the helpful names and structure of the original source.',
+          'Start by grouping familiar patterns. A prologue is function setup; an epilogue is cleanup before return. You learned both when building a stack frame.',
         ],
         diagram: 'disassembly',
       },
       {
-        id: 'increment-function',
-        title: 'A small function pattern',
+        id: 'recognize-add-one',
+        title: 'Then summarize the body',
         paragraphs: [
-          'To spill a register means to save its value in memory, often in a stack slot. This function saves FP/LR, spills its X0 argument, loads it again, adds one, and leaves the result in X0 before restoring the frame.',
+          'The middle stores X0 in a stack slot, loads it back, and adds one. Compilers may emit different code, so treat this as one recognizable example rather than a guaranteed template.',
+          'A useful first summary is: this function receives one value and returns that value plus one.',
         ],
-        code: `function:
-    stp x29, x30, [sp, #-32]!
-    mov x29, sp
-    str x0, [sp, #16]
-    ldr x0, [sp, #16]
-    add x0, x0, #1
-    ldp x29, x30, [sp], #32
-    ret`,
-        callout: 'Simplified pseudocode: long function(long value) { return value + 1; }',
-      },
-      {
-        id: 'trace-real-looking-code',
-        title: 'Trace it in context',
-        paragraphs: [
-          'The lab adds a small caller so RET has a valid saved destination. Watch X0 travel through the call and return as 42.',
-        ],
+        code: PROGRAMS.disassembly,
+        walkthrough: {
+          before: ['Caller places 41 in X0', 'BL enters function'],
+          execute: 'setup; save and reload X0; add 1; cleanup; RET',
+          after: ['X0 = 42', 'SP, X29, and X30 restored', 'Caller copies the result into X1'],
+        },
+        callout: 'Read structure first, then explain the few instructions that perform the useful work.',
       },
     ],
-    quiz: [
-      {
-        id: 'disassembly-purpose',
-        prompt: 'What is the function approximately doing to its X0 argument?',
-        code: `str x0, [sp, #16]
-ldr x0, [sp, #16]
-add x0, x0, #1`,
-        options: [
-          { id: 'a', label: 'Returns the value plus 1' },
-          { id: 'b', label: 'Returns the stack address' },
-          { id: 'c', label: 'Compares the value with 1' },
-          { id: 'd', label: 'Calls an indirect function' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'The argument is stored and reloaded, then ADD increments the return-value register X0 by one.',
-      },
-    ],
-    labProgram: `_start:
-    mov x0, 41
-    bl function
-    b end
-
-function:
-    stp x29, x30, [sp, #-32]!
-    mov x29, sp
-    str x0, [sp, #16]
-    ldr x0, [sp, #16]
-    add x0, x0, #1
-    ldp x29, x30, [sp], #32
-    ret
-
-end:
-    mov x1, x0`,
+    quiz: [{
+      id: 'disassembly-summary',
+      prompt: 'What does function approximately return for input 41?',
+      code: PROGRAMS.disassembly,
+      options: [
+        { id: 'a', label: '0' },
+        { id: 'b', label: '1' },
+        { id: 'c', label: '41' },
+        { id: 'd', label: '42' },
+      ],
+      correctOptionId: 'd',
+      explanation: 'The body reloads the input and adds one, so input 41 produces return value 42.',
+    }],
+    labProgram: PROGRAMS.disassembly,
+    nextStep: 'You can summarize an assembly function. Next, connect that summary to a small piece of C-like source.',
+    visualFocus: ['stack', 'calls'],
   },
   {
     id: 'c-to-arm64',
-    order: 16,
-    title: 'C to ARM64',
+    order: 33,
+    title: 'Map C Ideas to ARM64',
     shortTitle: 'C to ARM64',
-    description: 'Connect small C operations to illustrative register and branch patterns.',
-    estimatedMinutes: 10,
-    prerequisites: ['function-calls', 'branches'],
+    description: 'Connect function parameters, addition, and a return value to registers you already know.',
+    estimatedMinutes: 8,
+    kind: 'concept',
+    coreIdea: 'Source-level operations can often be recognized as flows through argument and result registers.',
+    newConcepts: ['source-to-assembly-mapping'],
+    buildsOn: ['calling-convention', 'register-width-aliases', 'arithmetic-dataflow', 'return-value-register'],
+    prerequisites: ['reading-disassembly', 'x-w-registers'],
+    registerFocus: ['x0', 'x1', 'x2', 'x30', 'pc'],
+    visualPrompt: 'Connect C parameters a and b to W0 and W1, pass both through ADD, and connect the resulting W0 to return.',
     sections: [
       {
-        id: 'integer-add',
-        title: 'Arguments become registers',
+        id: 'follow-values-not-lines',
+        title: 'Start with values crossing the function boundary',
         paragraphs: [
-          'For the illustrative C function int add(int a, int b), W0 can hold a, W1 can hold b, and W0 can hold the returned sum.',
-          'A compact possible body is ADD W0, W0, W1 followed by RET. This is illustrative, not guaranteed compiler output.',
+          'Imagine the C idea “add two int values and return the sum.” The common convention places those inputs in W0 and W1 and one int result in W0.',
+          'This is a conceptual mapping. Actual compiler output depends on optimization, surrounding code, and toolchain choices.',
         ],
-        code: `addints:
-    add w0, w0, w1
-    ret`,
         diagram: 'c-mapping',
       },
       {
-        id: 'if-pattern',
-        title: 'Conditions become flags and branches',
+        id: 'one-instruction-body',
+        title: 'Recognize the useful operation',
         paragraphs: [
-          'A C condition such as if (a == b) can become CMP followed by a conditional branch. Other instruction selections are also possible.',
+          'Inside addints, add w0, w0, w1 reads both inputs and replaces W0 with their sum. RET then follows the saved return address.',
+          'Using W registers fits a 32-bit C int in this illustrative example.',
         ],
-        code: `cmp w0, w1
-b.ne notequal
-mov w2, 1
-b end
-
-notequal:
-    mov w2, 0
-
-end:
-    mov w3, w2`,
-        callout: 'C describes intent; assembly exposes one concrete implementation of the data and control flow.',
+        code: PROGRAMS.cMapping,
+        walkthrough: {
+          before: ['W0 = 10 (first int argument)', 'W1 = 20 (second int argument)'],
+          execute: 'add w0, w0, w1; then ret',
+          after: ['W0 = 30 (int return value)', 'Caller resumes', 'W2 receives a copy of 30'],
+        },
+        callout: 'Use the calling convention as a map, not as proof of the original source code.',
       },
     ],
-    quiz: [
-      {
-        id: 'c-register-map',
-        prompt: 'In the illustrated add function, where is the integer return value placed?',
-        code: `add w0, w0, w1
-ret`,
-        options: [
-          { id: 'a', label: 'W0' },
-          { id: 'b', label: 'W1' },
-          { id: 'c', label: 'X29' },
-          { id: 'd', label: 'SP' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'The common calling convention uses W0/X0 for the first argument and for an integer or pointer return value.',
-      },
-    ],
-    labProgram: `_start:
-    mov w0, 10
-    mov w1, 20
-    bl addints
-    b end
-
-addints:
-    add w0, w0, w1
-    ret
-
-end:
-    mov w2, w0`,
+    quiz: [{
+      id: 'c-map-result',
+      prompt: 'What value returns in W0 from addints?',
+      code: PROGRAMS.cMapping,
+      options: [
+        { id: 'a', label: '10' },
+        { id: 'b', label: '20' },
+        { id: 'c', label: '30' },
+        { id: 'd', label: 'The address in X30' },
+      ],
+      correctOptionId: 'c',
+      explanation: 'ADD combines the two 32-bit arguments and writes their sum, 30, into the return register W0.',
+    }],
+    labProgram: PROGRAMS.cMapping,
+    nextStep: 'Mappings help explain intended behavior. Next, inspect raw runtime state when no source-level story is available.',
+    visualFocus: ['registers', 'calls'],
   },
   {
     id: 'debugging-state',
-    order: 17,
-    title: 'Debugging ARM64 State',
-    shortTitle: 'Debugging State',
-    description: 'Prioritize PC, LR, SP, arguments, pointers, and repeated byte patterns in a register snapshot.',
-    estimatedMinutes: 9,
-    prerequisites: ['registers', 'addresses-pointers', 'function-calls'],
+    order: 34,
+    title: 'Debugging from CPU State',
+    shortTitle: 'Debug State',
+    description: 'Use a repeatable inspection order and treat recognizable byte patterns as clues.',
+    estimatedMinutes: 8,
+    kind: 'concept',
+    coreIdea: 'A debugger snapshot becomes readable when you inspect control flow, stack position, arguments, and unusual values in a consistent order.',
+    newConcepts: ['debug-state-triage', 'recognizable-byte-pattern'],
+    buildsOn: ['general-registers', 'pointer', 'link-register', 'stack-pointer'],
+    prerequisites: ['c-to-arm64', 'function-calls', 'stack'],
+    registerFocus: ['x1', 'x29', 'x30', 'sp', 'pc'],
+    visualPrompt: 'Spotlight PC, then X30, SP, argument registers, and finally repeated 41 bytes while dimming unrelated state.',
     sections: [
       {
-        id: 'state-triage',
-        title: 'Start with control and stack state',
+        id: 'use-an-inspection-order',
+        title: 'Ask the same questions each time',
         paragraphs: [
-          'PC shows where execution is headed, LR often shows where the current function plans to return, and SP anchors the current stack view.',
-          'Next inspect argument registers and any values that resemble mapped addresses.',
-        ],
-        bullets: [
-          'PC: current instruction address',
-          'X30 / LR: likely return address',
-          'SP and X29 / FP: current stack context',
-          'X0–X7: likely arguments or recent values',
+          'First inspect PC: where will execution happen? Then inspect X30/LR and SP: where could execution return, and where is the current stack top?',
+          'Next inspect X0–X7 for likely arguments and values that resemble memory addresses. Context decides whether a value is truly a pointer.',
         ],
         diagram: 'debug-state',
       },
       {
-        id: 'repeated-pattern',
-        title: 'Repeated bytes stand out',
+        id: 'patterns-are-clues',
+        title: 'Repeated bytes attract attention',
         paragraphs: [
-          'Hex byte 0x41 is ASCII A. Debuggers often use repeated, recognizable input bytes, so 0x4141414141414141 is easy to connect back to eight A characters in test input.',
-          'A repeated input pattern in PC or LR is especially unusual because those registers normally contain executable addresses. It can suggest overwritten control data, but the pattern alone does not prove a vulnerability.',
+          'ASCII is a common mapping between characters and byte values. It maps A to 0x41, so 0x4141414141414141 is eight repeated A bytes. Such patterns are deliberately easy to recognize during debugging and exploit education.',
+          'A pattern in LR or PC is unusual and worth investigating, but it does not by itself prove a vulnerability or explain how the value arrived there.',
         ],
-        bullets: [
-          'X1 = 0x4141414141414141 → repeated A bytes',
-          'X29 = 0x00007fffffffdff0 → pointer-looking stack address',
-          'X30 or PC = 0x4141414141414141 → suspicious control-flow value',
-        ],
-      },
-      {
-        id: 'build-debug-state',
-        title: 'Create a state to inspect',
-        paragraphs: [
-          'Step through the lab and inspect which values look like data, stack pointers, or control information. A pattern alone proves nothing; context determines what it means.',
-        ],
-        code: `mov x1, 0x4141414141414141
-mov x29, sp
-sub sp, sp, #32
-mov x30, 0x4141414141414141
-mov x2, x1`,
+        code: PROGRAMS.debug,
+        walkthrough: {
+          before: ['X1 and X30 do not contain the repeated pattern', 'SP is at the normal stack top'],
+          execute: 'Step through the MOV and SUB instructions',
+          after: ['X1 = 0x4141414141414141', 'X30 = 0x4141414141414141', 'SP is 32 bytes lower', 'PC advances normally because this example does not RET'],
+        },
+        callout: 'Treat unusual values as evidence to investigate, not as a complete diagnosis.',
       },
     ],
-    quiz: [
-      {
-        id: 'debug-pattern',
-        prompt: 'Which value most clearly looks like repeated ASCII input rather than an ordinary aligned code address?',
-        options: [
-          { id: 'a', label: '0x0000000000000010' },
-          { id: 'b', label: '0x00007fffffffdff0' },
-          { id: 'c', label: '0x4141414141414141' },
-          { id: 'd', label: '0x0000000000400000' },
-        ],
-        correctOptionId: 'c',
-        explanation: '0x41 is ASCII A, so the value is a repeated-byte pattern. In PC or LR it would deserve immediate investigation.',
-      },
-    ],
-    labProgram: `mov x1, 0x4141414141414141
-mov x29, sp
-sub sp, sp, #32
-mov x30, 0x4141414141414141
-mov x2, x1`,
+    quiz: [{
+      id: 'debug-repeated-pattern',
+      prompt: 'Why is 0x4141414141414141 visually recognizable?',
+      code: PROGRAMS.debug,
+      options: [
+        { id: 'a', label: 'Each 0x41 byte is ASCII A' },
+        { id: 'b', label: 'It is always a valid stack address' },
+        { id: 'c', label: 'It is the Linux write syscall number' },
+        { id: 'd', label: 'It automatically sets the Z flag' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'The repeated hexadecimal byte 41 represents repeated ASCII A characters, making the pattern easy to spot.',
+    }],
+    labProgram: PROGRAMS.debug,
+    nextStep: 'You can recognize suspicious state. Next, follow control flow when the destination comes from a register.',
+    visualFocus: ['registers'],
   },
   {
-    id: 'native-code-patterns',
-    order: 18,
-    title: 'Common Native-Code Patterns',
-    shortTitle: 'Native Patterns',
-    description: 'Recognize practical argument, frame, memory, branch, direct-call, and indirect-call patterns.',
-    estimatedMinutes: 14,
-    prerequisites: ['reading-disassembly', 'debugging-state'],
+    id: 'indirect-control-flow',
+    order: 35,
+    title: 'Indirect Jumps and Calls',
+    shortTitle: 'BR & BLR',
+    description: 'Follow BR and BLR when a register supplies the next instruction address.',
+    estimatedMinutes: 8,
+    kind: 'concept',
+    coreIdea: 'Indirect control flow takes its destination from a register instead of naming the destination in the instruction.',
+    newConcepts: ['indirect-jump', 'indirect-call'],
+    buildsOn: ['unconditional-branch', 'branch-with-link', 'link-register', 'address-pseudo-load'],
+    prerequisites: ['debugging-state', 'loading-addresses', 'function-calls'],
+    registerFocus: ['x0', 'x8', 'x9', 'x30', 'pc'],
+    visualPrompt: 'Contrast a fixed BL label arrow with BLR following X8 and BR following X9; highlight X30 only on the call path.',
     sections: [
       {
-        id: 'pattern-checklist',
-        title: 'A practical reading checklist',
+        id: 'target-in-a-register',
+        title: 'The destination may be computed earlier',
         paragraphs: [
-          'When reading a native function, identify its incoming arguments, pointer dereferences, return value, saved LR, frame shape, comparisons, branches, and calls.',
-        ],
-        bullets: [
-          'X0–X7 often reveal function inputs',
-          'LDR and STR reveal memory flow',
-          'CMP plus B.cond reveals decisions',
-          'STP/LDP of X29 and X30 reveals frame boundaries',
-          'BL names a direct target; BLR calls through a register',
-        ],
-      },
-      {
-        id: 'indirect-control-flow',
-        title: 'Indirect jumps and calls',
-        paragraphs: [
-          'A direct call names its destination in the instruction. An indirect call reads its destination address from a register, so the target can be chosen at runtime.',
-          'BL function makes a direct call to a label and saves a return address. BLR X8 indirectly calls the address currently stored in X8 and also saves a return address.',
-          'BR X8 jumps to the address in X8 without saving a new return address. Indirect targets often come from tables, callbacks, or resolved function pointers.',
-        ],
-        bullets: [
-          'bl function → direct call',
-          'blr x8 → indirect call through X8',
-          'br x8 → indirect jump through X8',
+          'You already know B and BL name a code label directly. Sometimes a program first places a code address in a register.',
+          'BR jumps to the address in its register. BLR calls the address in its register and also writes the return address into X30.',
         ],
         diagram: 'indirect-call',
       },
       {
-        id: 'trace-indirect-flow',
-        title: 'Trace both indirect forms',
+        id: 'call-versus-jump',
+        title: 'Only the call creates a return route',
         paragraphs: [
-          'The lab loads code-label addresses into registers. BLR calls worker and sets LR; after RET, BR jumps to end without changing LR.',
+          'ldr x8, =worker obtains worker\'s code address. blr x8 enters worker and prepares RET by updating X30.',
+          'Later br x9 jumps to end without changing X30. This register-target form is useful when a program chooses its destination while it is running.',
         ],
-        code: `_start:
-    mov x0, 5
-    ldr x8, =worker
-    blr x8
-    ldr x9, =end
-    br x9
-
-worker:
-    add x0, x0, #10
-    ret
-
-end:
-    mov x1, x0`,
+        code: PROGRAMS.indirect,
+        walkthrough: {
+          before: ['X8 = address of worker', 'X30 holds its older value'],
+          execute: 'blr x8; worker returns; later br x9',
+          after: ['BLR saved a return address in X30', 'worker changed X0 from 5 to 15', 'BR reached end without creating another return address'],
+        },
+        callout: 'BLR = indirect call with link. BR = indirect jump without link.',
       },
     ],
-    quiz: [
-      {
-        id: 'patterns-blr',
-        prompt: 'What distinguishes BLR X8 from BR X8 in this simulator?',
-        options: [
-          { id: 'a', label: 'BLR saves a return address in X30' },
-          { id: 'b', label: 'BR always jumps to a text label' },
-          { id: 'c', label: 'BLR reads eight bytes from memory' },
-          { id: 'd', label: 'BR stores X8 on the stack' },
-        ],
-        correctOptionId: 'a',
-        explanation: 'Both use the address in X8, but BLR is a call and writes the next instruction address to X30 / LR. BR does not.',
-      },
-    ],
-    labProgram: `_start:
-    mov x0, 5
-    ldr x8, =worker
-    blr x8
-    ldr x9, =end
-    br x9
-
-worker:
-    add x0, x0, #10
-    ret
-
-end:
-    mov x1, x0`,
+    quiz: [{
+      id: 'indirect-link-difference',
+      prompt: 'What does BLR do that BR does not?',
+      code: PROGRAMS.indirect,
+      options: [
+        { id: 'a', label: 'Write a return address into X30' },
+        { id: 'b', label: 'Read eight bytes from stack memory' },
+        { id: 'c', label: 'Set X8 to the target address' },
+        { id: 'd', label: 'Exit through SVC 0' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'BLR is an indirect call, so it saves the next instruction address in X30. BR only jumps.',
+    }],
+    labProgram: PROGRAMS.indirect,
+    nextStep: 'Direct and indirect control flow are now familiar. Next, combine the course into one practical native-code reading method.',
+    visualFocus: ['registers', 'calls'],
   },
-];
+  {
+    id: 'native-code-patterns',
+    order: 36,
+    title: 'Recognize Native-Code Patterns',
+    shortTitle: 'Native Patterns',
+    description: 'Combine register, memory, stack, comparison, branch, and call clues into one calm reading process.',
+    estimatedMinutes: 10,
+    kind: 'integration',
+    coreIdea: 'Unfamiliar native code becomes manageable when you trace known patterns and state changes in execution order.',
+    newConcepts: [],
+    buildsOn: ['disassembly-pattern-reading', 'source-to-assembly-mapping', 'debug-state-triage', 'indirect-call', 'equality-branch', 'return-value-register'],
+    prerequisites: ['indirect-control-flow', 'reading-disassembly', 'debugging-state'],
+    registerFocus: ['x0', 'x2', 'x29', 'x30', 'sp'],
+    visualPrompt: 'Layer familiar clues in order: arguments, BL, saved LR and FP, calculation, comparison, branch, restore, and returned value.',
+    sections: [
+      {
+        id: 'read-outside-in',
+        title: 'Begin with boundaries and control flow',
+        paragraphs: [
+          'First find calls, returns, and branch targets. Then identify likely arguments and results. Finally trace the loads, stores, arithmetic, and comparisons that transform those values.',
+          'This order keeps details attached to a purpose instead of treating every instruction as a new mystery.',
+        ],
+        diagram: 'disassembly',
+      },
+      {
+        id: 'combine-known-clues',
+        title: 'Explain one complete function',
+        paragraphs: [
+          'transform uses a familiar prologue, adds 10 to its X0 input, compares the result with 15, conditionally copies it into X1, then restores its frame and returns.',
+          'Nothing in the sequence requires a new CPU rule. It combines the register, flag, branch, frame, and calling-convention models you built separately.',
+        ],
+        code: PROGRAMS.synthesis,
+        walkthrough: {
+          before: ['X0 = 5', 'Caller is about to execute BL transform'],
+          execute: 'call; setup; add; compare; branch; restore; return',
+          after: ['X0 = 15', 'X1 = 15 because B.NE is not taken', 'X2 = 15 in the caller', 'SP and saved registers restored'],
+        },
+        callout: 'When code feels dense, return to one question: what state does this instruction change?',
+      },
+    ],
+    quiz: [{
+      id: 'native-pattern-result',
+      prompt: 'Why does transform execute mov x1, x0 in this example?',
+      code: PROGRAMS.synthesis,
+      options: [
+        { id: 'a', label: 'CMP makes Z = 1, so B.NE is not taken' },
+        { id: 'b', label: 'RET always sets X1 equal to X0' },
+        { id: 'c', label: 'STP stores the result directly in X1' },
+        { id: 'd', label: 'BL clears all comparison flags' },
+      ],
+      correctOptionId: 'a',
+      explanation: 'Adding 10 to 5 produces 15. CMP against 15 sets Z, so B.NE falls through to the MOV.',
+    }],
+    labProgram: PROGRAMS.synthesis,
+    nextStep: 'You have completed the guided progression. Keep using Challenges and the Lab to strengthen pattern recognition through practice.',
+    visualFocus: ['stack', 'calls'],
+  },
+ ] satisfies Lesson[]);
 
 export function getLesson(id: string): Lesson | undefined {
   return LESSONS.find((lesson) => lesson.id === id);

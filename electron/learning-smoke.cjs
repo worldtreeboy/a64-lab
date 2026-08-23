@@ -39,10 +39,15 @@ app.whenReady().then(async () => {
     const guide = await window.webContents.executeJavaScript(`({
       route: location.hash,
       title: document.querySelector('.lesson-header h2')?.textContent,
+      lessons: document.querySelectorAll('.lesson-list a').length,
+      stages: document.querySelectorAll('.lesson-stage').length,
       sections: document.querySelectorAll('.lesson-section').length,
       diagrams: document.querySelectorAll('.concept-diagram').length,
       examples: document.querySelectorAll('.assembly-example').length,
+      mentalModel: Boolean(document.querySelector('.lesson-mental-model')),
+      walkthrough: Boolean(document.querySelector('.state-walkthrough')),
       liveVisualizer: Boolean(document.querySelector('.live-lesson-demo .dynamic-visualizer')),
+      focusedVisualizer: Boolean(document.querySelector('.live-lesson-demo [data-testid="dynamic-context"]')),
       spacedParagraph: Number.parseFloat(getComputedStyle(document.querySelector('.lesson-section p')).marginBottom) >= 10,
       scrollable: (() => {
         const pane = document.querySelector('.guide-main');
@@ -91,7 +96,7 @@ app.whenReady().then(async () => {
       liveVisualizer: Boolean(document.querySelector('.learning-sidebar .dynamic-visualizer'))
     })`);
 
-    window.setSize(390, 844);
+    window.setSize(320, 844);
     await loadRoute(window, '/guide/stack');
     const mobile = await window.webContents.executeJavaScript(`({
       curriculumToggle: Boolean(document.querySelector('.curriculum-toggle')),
@@ -101,11 +106,16 @@ app.whenReady().then(async () => {
 
     console.log(JSON.stringify({ guide, challenges, lab, mobile, consoleErrors: errors }));
     const valid = guide.route === '#/guide/registers'
-      && guide.title === 'Registers'
+      && guide.title === 'General Registers'
+      && guide.lessons === 36
+      && guide.stages === 6
       && guide.sections > 0
       && guide.diagrams > 0
       && guide.examples > 0
+      && guide.mentalModel
+      && guide.walkthrough
       && guide.liveVisualizer
+      && guide.focusedVisualizer
       && guide.spacedParagraph
       && guide.scrollable
       && guide.noHorizontalOverflow

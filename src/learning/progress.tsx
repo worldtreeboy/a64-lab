@@ -65,6 +65,7 @@ export function loadProgress(storage: Pick<Storage, 'getItem'> = localStorage): 
 interface ProgressContextValue {
   progress: LearningProgress;
   markLessonComplete: (lessonId: string) => void;
+  unmarkLessonComplete: (lessonId: string) => void;
   recordQuizResult: (lessonId: string, questionId: string, correct: boolean) => void;
   markChallengeComplete: (challengeId: string) => void;
   resetProgress: () => void;
@@ -85,6 +86,14 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       setProgress((current) => current.completedLessons.includes(lessonId)
         ? current
         : { ...current, completedLessons: [...current.completedLessons, lessonId] });
+    },
+    unmarkLessonComplete: (lessonId) => {
+      setProgress((current) => current.completedLessons.includes(lessonId)
+        ? {
+            ...current,
+            completedLessons: current.completedLessons.filter((id) => id !== lessonId),
+          }
+        : current);
     },
     recordQuizResult: (lessonId, questionId, correct) => {
       const key = `${lessonId}:${questionId}`;

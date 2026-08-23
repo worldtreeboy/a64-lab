@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { CURRICULUM_STAGES, lessonsForStage } from '../../learning/curriculum';
 import { LESSONS } from '../../learning/lessons';
 import { percentComplete, useProgress } from '../../learning/progress';
 import { ProgressBar } from './ProgressBar';
@@ -36,21 +37,29 @@ export function GuideSidebar({ currentLessonId }: { currentLessonId?: string }) 
           detail={`${completed.size} / ${LESSONS.length} lessons`}
         />
         <nav className="lesson-list" aria-label="ARM64 lessons">
-          {LESSONS.map((lesson) => {
-            const isComplete = completed.has(lesson.id);
-            return (
-              <NavLink
-                to={`/guide/${lesson.id}`}
-                key={lesson.id}
-                className={({ isActive }) => isActive ? 'active' : ''}
-              >
-                <span className={`lesson-status ${isComplete ? 'complete' : ''}`} aria-hidden="true">
-                  {isComplete ? '✓' : currentLessonId === lesson.id ? '→' : lesson.order}
-                </span>
-                <span>{lesson.shortTitle}</span>
-              </NavLink>
-            );
-          })}
+          {CURRICULUM_STAGES.map((stage) => (
+            <section className="lesson-stage" aria-labelledby={`stage-${stage.id}`} key={stage.id}>
+              <header>
+                <span id={`stage-${stage.id}`}>{stage.title}</span>
+                <small>{stage.firstLesson}–{stage.lastLesson}</small>
+              </header>
+              {lessonsForStage(stage).map((lesson) => {
+                const isComplete = completed.has(lesson.id);
+                return (
+                  <NavLink
+                    to={`/guide/${lesson.id}`}
+                    key={lesson.id}
+                    className={({ isActive }) => isActive ? 'active' : ''}
+                  >
+                    <span className={`lesson-status ${isComplete ? 'complete' : ''}`} aria-hidden="true">
+                      {isComplete ? '✓' : currentLessonId === lesson.id ? '→' : lesson.order}
+                    </span>
+                    <span>{lesson.shortTitle}</span>
+                  </NavLink>
+                );
+              })}
+            </section>
+          ))}
         </nav>
       </div>
     </aside>

@@ -6,6 +6,11 @@ const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: stri
     nodes: ['PC', 'instruction', 'registers + memory', 'next PC'],
     note: 'The PC selects an instruction; execution changes state and advances or branches.',
   },
+  'general-registers': {
+    label: 'General register values',
+    nodes: ['X0 = 10', 'MOV X2, X0', 'X2 = 10'],
+    note: 'Registers are named CPU storage. Copying a value leaves the source unchanged.',
+  },
   'register-map': {
     label: 'X and W register relationship',
     nodes: ['X0 · 64 bits', 'lower 32 bits', 'W0 · 32 bits'],
@@ -16,14 +21,29 @@ const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: stri
     nodes: ['X0 = 10', 'X1 = 20', 'ADD', 'X2 = 30'],
     note: 'ADD reads both sources and writes their sum to the destination.',
   },
+  'address-number': {
+    label: 'A register value interpreted as a memory address',
+    nodes: ['X1', '0x00400000', 'memory at 0x00400000'],
+    note: 'A pointer is a number that code interprets as an address.',
+  },
   pointer: {
     label: 'Pointer to data memory',
     nodes: ['X1 = 0x400000', '.data:message', '"android"'],
     note: 'The register holds an address, not the string itself.',
   },
+  'memory-store': {
+    label: 'Store a register value into memory',
+    nodes: ['X0 = 42', 'STR X0, [X1]', 'memory[X1] = 42'],
+    note: 'STR copies a register value to memory. The source register and pointer stay unchanged.',
+  },
+  'memory-load': {
+    label: 'Load a memory value into a register',
+    nodes: ['memory[X1] = 42', 'LDR X2, [X1]', 'X2 = 42'],
+    note: 'LDR reads memory through the pointer and writes the value into its destination register.',
+  },
   'load-store': {
     label: 'Load and store directions',
-    nodes: ['X0 = 42', 'STR → [SP]', 'LDR → X1 = 42'],
+    nodes: ['X0 = 42', 'STR → [X1]', 'LDR → X2 = 42'],
     note: 'STR moves data to memory. LDR moves data from memory.',
   },
   'little-endian': {
@@ -36,10 +56,25 @@ const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: stri
     nodes: ['SP = …E000', 'SUB SP, SP, #16', 'SP = …DFF0'],
     note: 'Allocating stack space moves SP toward lower addresses.',
   },
+  'register-pair': {
+    label: 'Two registers stored in neighboring stack slots',
+    nodes: ['X29 and X30', 'STP [SP]', '[SP] and [SP + 8]', 'LDP [SP]', 'X29 and X30'],
+    note: 'STP and LDP move two 64-bit registers between registers and neighboring memory slots.',
+  },
   'stack-frame': {
     label: 'Saved frame pointer and link register',
     nodes: ['higher addresses', 'saved X30 / LR', 'saved X29 / FP ← SP', 'lower addresses'],
     note: 'A paired store preserves FP and LR in one 16-byte frame.',
+  },
+  'frame-pointer': {
+    label: 'Frame pointer remains stable while SP moves',
+    nodes: ['SP = frame', 'MOV X29, SP', 'SP moves', 'X29 = frame'],
+    note: 'X29 can preserve a stable frame address while later instructions move SP.',
+  },
+  'zero-flag': {
+    label: 'Equality comparison sets the zero flag',
+    nodes: ['CMP 5, 5', '5 − 5 = 0', 'Z = 1'],
+    note: 'CMP keeps the flags, not the numeric subtraction result.',
   },
   flags: {
     label: 'Comparison flags',
@@ -51,25 +86,50 @@ const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: stri
     nodes: ['CMP', 'Z = 0', 'B.NE', 'notequal'],
     note: 'B.NE is taken when Z is clear.',
   },
+  'unconditional-branch': {
+    label: 'Unconditional branch changes the next PC',
+    nodes: ['PC at B', 'B target', 'PC at target'],
+    note: 'B always chooses its label, so the sequential instruction is skipped.',
+  },
   'function-call': {
     label: 'Direct function call',
     nodes: ['caller', 'BL foo · LR = return', 'foo', 'RET · PC = LR', 'caller'],
     note: 'BL records where RET should continue.',
+  },
+  'lr-overwrite': {
+    label: 'A nested BL overwrites the older return address',
+    nodes: ['BL foo · X30 = return to _start', 'BL bar · X30 = return to foo', 'old X30 is lost'],
+    note: 'foo must save its return address before it executes BL bar.',
   },
   'nested-calls': {
     label: 'Nested function calls',
     nodes: ['_start → foo', 'save foo LR', 'foo → bar', 'restore foo LR', 'foo → _start'],
     note: 'foo saves LR because BL bar overwrites X30.',
   },
+  'indexed-addressing': {
+    label: 'Pre-index and post-index update order',
+    nodes: ['pre-index · update then access', 'memory operation', 'post-index · access then update'],
+    note: 'The punctuation tells you whether the base register changes before or after memory is accessed.',
+  },
   'data-bytes': {
     label: 'String in data memory',
     nodes: ['"ARM64\\n"', '41 52 4D 36 34 0A', '00'],
     note: '.asciz appends the final NULL byte; .ascii does not.',
   },
+  'code-sections': {
+    label: 'Code and data occupy separate sections',
+    nodes: ['.data · stored bytes', 'label · named address', '.text · instructions'],
+    note: 'Directives organize the program but do not execute or consume instruction addresses.',
+  },
   syscall: {
     label: 'Linux AArch64 syscall',
     nodes: ['X0–X5 arguments', 'X8 syscall number', 'SVC 0', 'kernel service'],
     note: 'These numbers are Linux AArch64 specific.',
+  },
+  'syscall-gate': {
+    label: 'SVC crosses from the program to a Linux service',
+    nodes: ['prepare X0–X5', 'select service in X8', 'SVC 0', 'Linux handles request'],
+    note: 'Preparing registers does nothing visible until SVC requests the selected Linux AArch64 service.',
   },
   disassembly: {
     label: 'Function pattern',
@@ -102,6 +162,24 @@ function PointerDiagram() {
         <path d="m162 49 14 9-14 9" />
       </svg>
       <div className="pointer-memory"><code>0x00400000</code><strong>.data:message</strong><span>"android"</span></div>
+    </div>
+  );
+}
+
+function RegisterMapDiagram() {
+  return (
+    <div className="register-map-scene" aria-hidden="true">
+      <div className="register-bit-labels"><span>bit 63</span><span>bit 32</span><span>bit 31</span><span>bit 0</span></div>
+      <div className="register-x-row">
+        <strong>X0 · 64 bits</strong>
+        <span>upper 32 bits</span>
+        <span className="register-w-half">W0 · lower 32 bits</span>
+      </div>
+      <div className="register-write-row">
+        <code>MOV W0, 1</code>
+        <span>clears upper 32 bits</span>
+        <strong>X0 = 1</strong>
+      </div>
     </div>
   );
 }
@@ -146,6 +224,71 @@ function StackFrameDiagram() {
   );
 }
 
+function LinkRegisterOverwriteDiagram() {
+  return (
+    <div className="lr-overwrite-scene" aria-hidden="true">
+      <div className="lr-overwrite-call">
+        <span>First call</span>
+        <code>_start: BL foo</code>
+        <strong>X30 = return to _start</strong>
+      </div>
+      <span className="lr-overwrite-arrow">BL bar overwrites X30 →</span>
+      <div className="lr-overwrite-call lr-overwrite-new">
+        <span>Nested call</span>
+        <code>foo: BL bar</code>
+        <strong>X30 = return to foo</strong>
+      </div>
+      <div className="lr-overwrite-warning">The older return address must be saved before the second BL.</div>
+    </div>
+  );
+}
+
+function IndexedAddressingDiagram() {
+  return (
+    <div className="indexed-addressing-scene" aria-hidden="true">
+      <div className="indexed-addressing-path indexed-pre">
+        <span>Pre-index · before</span>
+        <code>stp x29, x30, [sp, #-16]!</code>
+        <ol>
+          <li><strong>1</strong> SP = SP - 16</li>
+          <li><strong>2</strong> Store X29 and X30</li>
+        </ol>
+      </div>
+      <div className="indexed-addressing-path indexed-post">
+        <span>Post-index · after</span>
+        <code>ldp x29, x30, [sp], #16</code>
+        <ol>
+          <li><strong>1</strong> Load X29 and X30</li>
+          <li><strong>2</strong> SP = SP + 16</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function FramePointerDiagram() {
+  return (
+    <div className="frame-pointer-scene" aria-hidden="true">
+      <div className="frame-pointer-phase">
+        <span>Before</span>
+        <code>SP → current frame</code>
+      </div>
+      <span className="frame-pointer-arrow">→</span>
+      <div className="frame-pointer-phase frame-pointer-anchor">
+        <span>Execute</span>
+        <code>mov x29, sp</code>
+        <strong>SP + X29 → frame</strong>
+      </div>
+      <span className="frame-pointer-arrow">→</span>
+      <div className="frame-pointer-phase">
+        <span>After SP moves</span>
+        <code>SP → lower address</code>
+        <strong>X29 → original frame</strong>
+      </div>
+    </div>
+  );
+}
+
 function EndianDiagram() {
   const bytes = ['88', '77', '66', '55', '44', '33', '22', '11'];
   return (
@@ -164,10 +307,18 @@ function EndianDiagram() {
 
 export function ConceptDiagram({ kind }: { kind: DiagramKind }) {
   const diagram = DIAGRAMS[kind];
-  const specialized = kind === 'pointer'
-    ? <PointerDiagram />
+  const specialized = kind === 'register-map'
+    ? <RegisterMapDiagram />
+    : kind === 'pointer'
+      ? <PointerDiagram />
     : kind === 'stack-growth'
       ? <StackGrowthDiagram />
+      : kind === 'lr-overwrite'
+        ? <LinkRegisterOverwriteDiagram />
+        : kind === 'indexed-addressing'
+          ? <IndexedAddressingDiagram />
+          : kind === 'frame-pointer'
+            ? <FramePointerDiagram />
       : kind === 'stack-frame'
         ? <StackFrameDiagram />
         : kind === 'little-endian'

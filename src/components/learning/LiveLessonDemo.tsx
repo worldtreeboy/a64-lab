@@ -1,16 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ARM64CPU } from '../../arm64/interpreter';
 import type { ParsedInstruction } from '../../arm64/parser';
-import { formatHex } from '../../arm64/registers';
+import { formatHex, type RegisterName } from '../../arm64/registers';
+import type { LessonFlagFocus, LessonVisualFocus } from '../../learning/types';
 import { DynamicVisualizer } from '../visualization/DynamicVisualizer';
 import { createVisualizationTransition, diffSnapshots } from '../visualization/transitions';
 
 interface LiveLessonDemoProps {
   program: string;
   title: string;
+  focus: readonly LessonVisualFocus[];
+  flagFocus?: readonly LessonFlagFocus[];
+  registerFocus: readonly RegisterName[];
+  visualPrompt: string;
 }
 
-export function LiveLessonDemo({ program, title }: LiveLessonDemoProps) {
+export function LiveLessonDemo({
+  program,
+  title,
+  focus,
+  flagFocus,
+  registerFocus,
+  visualPrompt,
+}: LiveLessonDemoProps) {
+  const sourceRef = useRef<HTMLPreElement>(null);
+  const activeLineRef = useRef<HTMLSpanElement>(null);
   const cpu = useMemo(() => {
     const instance = new ARM64CPU();
     instance.loadProgram(program);
@@ -67,13 +81,31 @@ export function LiveLessonDemo({ program, title }: LiveLessonDemoProps) {
   const currentLine = cpu.currentInstruction?.sourceLine ?? null;
   const headingId = `live-demo-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`;
 
+  useEffect(() => {
+    const source = sourceRef.current;
+    const activeLine = activeLineRef.current;
+    if (!source || !activeLine) return;
+
+    // Keep the highlighted instruction visible inside the code pane without
+    // moving the entire Guide page while the learner repeatedly presses Step.
+    const sourceBounds = source.getBoundingClientRect();
+    const lineBounds = activeLine.getBoundingClientRect();
+    if (sourceBounds.height === 0 || lineBounds.height === 0) return;
+    const inset = 12;
+    if (lineBounds.top < sourceBounds.top + inset) {
+      source.scrollTop -= sourceBounds.top + inset - lineBounds.top;
+    } else if (lineBounds.bottom > sourceBounds.bottom - inset) {
+      source.scrollTop += lineBounds.bottom - (sourceBounds.bottom - inset);
+    }
+  }, [currentLine]);
+
   return (
     <section className="live-lesson-demo" aria-labelledby={headingId}>
       <header className="live-demo-heading">
         <div>
           <span className="eyebrow">WATCH THE REAL CPU STATE</span>
           <h3 id={headingId}>Step through this lesson</h3>
-          <p>The diagram below is generated from the same ARM64 engine used by the full Lab.</p>
+          <p>{visualPrompt}</p>
         </div>
         <div className="live-demo-status">
           <span>{snapshot.halted ? 'Complete' : 'Ready'}</span>
@@ -82,13 +114,18 @@ export function LiveLessonDemo({ program, title }: LiveLessonDemoProps) {
       </header>
 
       <div className="live-demo-console">
-        <pre className="live-demo-source" aria-label={`${title} interactive assembly`}>
+        <pre className="live-demo-source" aria-label={`${title} interactive assembly`} ref={sourceRef}>
           <code>
             {program.split('\n').map((line, index) => {
               const sourceLine = index + 1;
               const active = sourceLine === currentLine;
               return (
-                <span className={`live-demo-line ${active ? 'active' : ''}`} aria-current={active ? 'step' : undefined} key={`${sourceLine}-${line}`}>
+                <span
+                  className={`live-demo-line ${active ? 'active' : ''}`}
+                  aria-current={active ? 'step' : undefined}
+                  key={`${sourceLine}-${line}`}
+                  ref={active ? activeLineRef : undefined}
+                >
                   <span aria-hidden="true">{active ? '▶' : sourceLine}</span>
                   <span>{line || ' '}</span>
                 </span>
@@ -107,7 +144,25 @@ export function LiveLessonDemo({ program, title }: LiveLessonDemoProps) {
       <DynamicVisualizer
         transition={transition}
         describeAddress={(address) => cpu.describeAddress(address)}
+        focus={focus}
+        flagFocus={flagFocus}
+        registerFocus={registerFocus}
       />
+
+      {focus.includes('terminal') && (
+        <section className="live-demo-terminal" aria-labelledby={`${headingId}-terminal`} data-testid="dynamic-terminal">
+          <div className="live-demo-terminal-heading">
+            <div>
+              <span className="eyebrow">SIMULATED LINUX OUTPUT</span>
+              <h4 id={`${headingId}-terminal`}>Terminal</h4>
+            </div>
+            {snapshot.exited && (
+              <span className="live-demo-exit-status">Exit status {snapshot.exitCode?.toString() ?? '—'}</span>
+            )}
+          </div>
+          <pre aria-label="Simulated terminal output">{snapshot.terminalOutput || 'No output yet — Step to SVC 0.'}</pre>
+        </section>
+      )}
     </section>
   );
 }

@@ -50,9 +50,9 @@ app.whenReady().then(async () => {
   });
 
   try {
-    const lesson = await pageHeading(window, '/guide/function-calls', '.lesson-header h2', 'Function Calls');
+    const lesson = await pageHeading(window, '/guide/function-calls', '.lesson-header h2', 'BL and the Link Register');
     await window.webContents.reload();
-    await waitForText(window, '.lesson-header h2', 'Function Calls');
+    await waitForText(window, '.lesson-header h2', 'BL and the Link Register');
     await waitForPaint(window);
     const refreshedLesson = await window.webContents.executeJavaScript(`({
       pathname: location.pathname,
@@ -63,10 +63,10 @@ app.whenReady().then(async () => {
     const result = { lesson, refreshedLesson, lab, challenges, consoleErrors: errors };
     console.log(JSON.stringify(result));
     const valid = lesson.pathname === '/guide/function-calls'
-      && lesson.heading === 'Function Calls'
+      && lesson.heading === 'BL and the Link Register'
       && lesson.rootHasContent
       && refreshedLesson.pathname === '/guide/function-calls'
-      && refreshedLesson.heading === 'Function Calls'
+      && refreshedLesson.heading === 'BL and the Link Register'
       && lab.pathname === '/lab'
       && lab.heading === 'Assembly Editor'
       && challenges.pathname === '/challenges'
