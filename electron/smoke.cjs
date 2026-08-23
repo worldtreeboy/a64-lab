@@ -12,7 +12,7 @@ app.whenReady().then(async () => {
   });
 
   try {
-    await window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    await window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: '/lab' });
     const result = await window.webContents.executeJavaScript(`({
       title: document.querySelector('h1')?.textContent,
       registerRows: document.querySelectorAll('.register-row').length,

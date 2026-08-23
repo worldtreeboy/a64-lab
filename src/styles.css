@@ -66,7 +66,7 @@
 html,
 body,
 #root {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100%;
   height: 100%;
   margin: 0;
@@ -155,6 +155,19 @@ textarea:focus-visible {
   height: 100%;
 }
 
+.app-shell.with-return-link {
+  grid-template-rows: 74px 38px minmax(0, 1fr) 82px;
+}
+
+.learning-page {
+  display: grid;
+  grid-template-rows: 74px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -163,6 +176,99 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--line);
   background: rgba(11, 15, 22, 0.94);
   backdrop-filter: blur(18px);
+}
+
+.brand-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.primary-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.primary-nav a {
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primary-nav a:hover,
+.primary-nav a.active {
+  border-color: rgba(75, 213, 231, 0.25);
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+.site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.site-header-actions .example-picker {
+  width: auto;
+  margin-left: 0;
+}
+
+.header-progress {
+  color: #8e9eb4;
+  font: 10px var(--mono);
+  white-space: nowrap;
+}
+
+.lab-return-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(75, 213, 231, 0.2);
+  color: #7f90a8;
+  background: rgba(75, 213, 231, 0.07);
+  font-size: 10px;
+}
+
+.lab-return-bar a {
+  color: var(--cyan);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.route-placeholder {
+  width: min(760px, calc(100% - 32px));
+  margin: auto;
+  padding: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.route-placeholder h2 {
+  margin: 8px 0;
+  color: var(--text);
+  font-size: clamp(28px, 4vw, 48px);
+}
+
+.route-placeholder p {
+  max-width: 620px;
+  margin: 0 0 24px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.route-placeholder .button {
+  display: inline-flex;
+  width: auto;
+  text-decoration: none;
 }
 
 .brand {
@@ -270,6 +376,8 @@ textarea:focus-visible {
   grid-template-columns: minmax(420px, 1.4fr) minmax(350px, 0.95fr) minmax(240px, 0.68fr);
   grid-template-rows: minmax(260px, 1fr) 220px 94px;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   padding: 10px;
 }
@@ -649,6 +757,75 @@ textarea:focus-visible {
 
 .learning-sidebar > section {
   border-bottom: 1px solid var(--line);
+}
+
+.learning-sidebar > .dynamic-visualizer {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #0b1018;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-header,
+.learning-sidebar > .dynamic-visualizer .dv-card,
+.learning-sidebar > .dynamic-visualizer .dv-register-changes,
+.learning-sidebar > .dynamic-visualizer .dv-data-flow,
+.learning-sidebar > .dynamic-visualizer .dv-stack {
+  grid-column: 1;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-header {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-instruction {
+  width: 100%;
+  max-width: none;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-flow-track,
+.learning-sidebar > .dynamic-visualizer .dv-pointer {
+  grid-template-columns: 1fr;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-operation svg,
+.learning-sidebar > .dynamic-visualizer .dv-pointer svg {
+  width: 46px;
+  height: 28px;
+  margin: auto;
+  transform: rotate(90deg);
+}
+
+.learning-sidebar > .dynamic-visualizer.dv-back .dv-operation svg {
+  transform: rotate(90deg) scaleX(-1);
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-stack-row {
+  grid-template-columns: 65px minmax(0, 1fr) 30px;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-stack-address,
+.learning-sidebar > .dynamic-visualizer .dv-stack-cell code,
+.learning-sidebar > .dynamic-visualizer .dv-register-change code {
+  font-size: 8px;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-stack-cell {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.learning-sidebar > .dynamic-visualizer .dv-stack-cell code {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .learning-sidebar .call-stack-panel {
@@ -1228,6 +1405,8 @@ textarea:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  width: 100%;
+  min-width: 0;
   padding: 0 24px;
   border-top: 1px solid var(--line);
   background: rgba(11, 15, 22, 0.97);
@@ -1357,6 +1536,16 @@ textarea:focus-visible {
     grid-template-rows: auto auto auto;
   }
 
+  .app-shell.with-return-link {
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .learning-page {
+    height: auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: visible;
+  }
+
   .topbar {
     min-height: 74px;
     flex-wrap: wrap;
@@ -1365,6 +1554,35 @@ textarea:focus-visible {
 
   .brand {
     margin-right: auto;
+  }
+
+  .site-header .brand {
+    min-width: 0;
+  }
+
+  .primary-nav {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .site-header-actions {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .site-header-actions .example-picker {
+    width: auto;
+  }
+
+  .site-header-actions .example-picker:first-of-type {
+    flex: 1 1 260px;
+  }
+
+  .lab-return-bar {
+    min-height: 42px;
+    flex-wrap: wrap;
+    padding-block: 7px;
   }
 
   .example-picker {
@@ -1471,10 +1689,60 @@ textarea:focus-visible {
 
   .control-buttons {
     width: 100%;
+    gap: 4px;
   }
 
   .button {
     flex: 1;
     padding: 0 10px;
+  }
+
+  .control-buttons .button {
+    min-width: 0;
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 9px;
+  }
+
+  .site-header {
+    gap: 10px;
+  }
+
+  .site-header .brand span,
+  .header-progress {
+    display: none;
+  }
+
+  .primary-nav {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .primary-nav a {
+    flex: 1;
+    text-align: center;
+  }
+
+  .site-header-actions {
+    order: 2;
+    width: auto;
+    margin-left: auto;
+  }
+
+  .site-header-actions .example-picker:not(.theme-picker) {
+    display: none;
+  }
+
+  .theme-picker span {
+    display: none;
+  }
+
+  .theme-picker select {
+    min-width: 118px;
+  }
+
+  .route-placeholder {
+    padding: 28px 22px;
   }
 }

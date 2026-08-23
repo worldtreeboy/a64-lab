@@ -1,45 +1,108 @@
 # A64 Lab
 
-An interactive AArch64 learning simulator for Android reverse-engineering and
-binary-exploitation fundamentals.
+An interactive AArch64 learning platform and visual ARM64 simulator for
+reverse engineering, low-level programming, and binary-exploitation
+fundamentals.
 
-![A64 Lab debugger interface](docs/a64-lab.png)
+![A64 Lab stack lesson with a visual memory diagram](docs/a64-guide.png)
 
-A64 Lab lets you write a focused subset of GNU-style ARM64 assembly and watch
-registers, flags, memory, stack state, function calls, and simplified Linux
-syscalls change one instruction at a time.
+A64 Lab combines a structured beginner course, prediction exercises, small
+coding challenges, and a debugger-style simulator. You can learn one concept,
+predict what an instruction will do, then step the same program and watch the
+real simulated CPU state change.
 
 > [!IMPORTANT]
 > A64 Lab is an educational interpreter. It does not emulate a complete ARM64
-> CPU, execute native machine code, or attach to Android processes like GDB or
-> LLDB.
+> CPU, execute native machine code, inspect APKs, or attach to processes like
+> GDB or LLDB.
 
-## Why A64 Lab?
+## Three connected learning areas
 
-ARM64 concepts become easier when every instruction has an immediate, visible
-effect. A64 Lab is designed to make these relationships concrete:
+| Route | Purpose |
+| --- | --- |
+| `/guide` | 18 short lessons from the ARM64 mental model to native-code patterns |
+| `/lab` | The full debugger-style simulator |
+| `/challenges` | Prediction and code exercises checked by the real simulator engine |
 
-- how X and W registers relate;
-- how pointers refer to stack and data memory;
-- how X0–X7 carry function arguments;
-- how BL stores a return address in X30/LR;
-- how FP/LR are saved in a stack frame;
-- how NZCV flags control conditional branches;
-- how Linux AArch64 `write` and `exit` syscalls use registers.
+Progress is stored locally in the browser. No account or backend is required.
 
-## Highlights
+## Learn from the beginning
+
+The Guide assumes no assembly experience. Each lesson follows the same focused
+loop:
+
+```text
+plain-language concept
+        ↓
+visual diagram + tiny example
+        ↓
+predict the result
+        ↓
+step a live mini-lab
+        ↓
+try the program in the full Lab
+        ↓
+check the idea and mark the lesson complete
+```
+
+The 18 modules cover:
+
+1. Meet ARM64
+2. Registers
+3. MOV and arithmetic
+4. Addresses and pointers
+5. Memory with LDR and STR
+6. Little endian
+7. The stack
+8. STP/LDP and stack frames
+9. CMP and NZCV
+10. Branches
+11. Function calls, BL, LR, and RET
+12. Nested function calls
+13. Data sections and strings
+14. Linux AArch64 syscalls
+15. Reading disassembly
+16. C to ARM64
+17. Debugging ARM64 state
+18. Common native-code patterns, BR, and BLR
+
+Lessons are deliberately concise—usually 5–15 focused minutes—and introduce
+terms before using them.
+
+## Live visual learning
+
+The diagrams in the Lab and lesson mini-labs are generated from before/after
+snapshots of the existing ARM64 engine. There is no second animation-only CPU.
+
+After Step, Run, Previous, or Reset, the visual layer can show:
+
+- register values moving from old to new;
+- ADD/SUB and load/store data flow;
+- SP moving through a vertical stack;
+- stack bytes and paired FP/LR saves changing;
+- registers pointing to `.data`, strings, code, or stack memory;
+- NZCV state and whether a conditional branch was taken;
+- BL updating PC and X30/LR;
+- nested call-stack growth and RET returning to the caller.
+
+Animations last only a few hundred milliseconds and respect reduced-motion
+preferences.
+
+![A64 Lab debugger with live register, data-flow, and stack visualization](docs/a64-lab.png)
+
+## Simulator highlights
 
 - X0–X30, W0–W30, SP, PC, FP/LR aliases, and NZCV flags
-- Correct W-register zero-extension into its corresponding X register
-- Step, Run, Reset, and full-state Step Back
-- Changed-register, flag, stack, and memory highlighting
-- Sparse, byte-addressable, little-endian memory
+- Correct W-register zero-extension into its paired X register
+- Step, Run, Reset, and complete-state Previous
+- Register, flag, stack, and memory change highlighting
+- Sparse byte-addressable, little-endian memory
 - Stack and hex/ASCII memory viewers
-- Clickable register pointers that navigate directly to memory
-- Labels, conditional branches, BL/RET, and a visual call stack
-- `.data` strings and GNU-style `ldr xN, =label`
-- Simplified Linux AArch64 syscall panel and terminal output
-- Five beginner examples and three visual themes
+- Clickable pointer hints that navigate to memory
+- Labels, conditional branches, BL/RET, BR/BLR, and a call-stack panel
+- GNU-style `.text`, `.data`, strings, symbols, and `ldr xN, =label`
+- Simplified Linux AArch64 `write` and `exit` syscalls
+- Terminal output, five built-in examples, and three saved visual themes
 - A React-independent TypeScript simulation engine
 
 ## Quick start
@@ -53,17 +116,18 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite.
+Open the URL printed by Vite. The Guide is the starting page; `/lab` opens the
+simulator directly.
 
-To run the Electron development wrapper:
+For the Electron development wrapper:
 
 ```bash
 npm run electron:dev
 ```
 
-## Try the Linux write example
+## Try a Linux write syscall
 
-This source runs unchanged:
+This GNU-style source runs unchanged:
 
 ```asm
 .section .data
@@ -87,10 +151,10 @@ _start:
 
 The terminal displays `shellcode`, then reports exit status `0`.
 
-`write` always reads exactly the number of bytes in X2; it does not stop at the
-NULL terminator. If you change the message, update X2 to its UTF-8 byte length.
+> `write` reads exactly X2 bytes. It does not stop at the NULL byte added by
+> `.asciz`. If you change the text, update X2 to its UTF-8 byte length.
 
-## Supported assembly
+## Supported educational subset
 
 | Category | Instructions |
 | --- | --- |
@@ -110,7 +174,7 @@ stp x29, x30, [sp, #-16]!
 ldp x29, x30, [sp], #16
 ```
 
-The parser accepts:
+The parser accepts these common GNU directives and forms:
 
 ```asm
 .section .data
@@ -125,8 +189,8 @@ ldr x1, =message
 ```
 
 Supported string escapes are `\n`, `\r`, `\t`, `\\`, `\"`, and `\0`.
-Assembler directives and labels do not consume instruction addresses. If a text
-symbol named `_start` exists, execution and Reset begin there.
+Directives and labels do not consume instruction addresses. If a text symbol
+named `_start` exists, execution and Reset begin there.
 
 ## Educational memory model
 
@@ -136,12 +200,12 @@ symbol named `_start` exists, execution and Reset begin there.
 | `.data` | `0x00400000` | Strings are allocated sequentially and restored on Reset |
 | Stack | `0x7FFFFFFFE000` | Sparse memory grows downward by convention |
 
-All addresses and X-register values use `bigint`, so the engine does not silently
-lose 64-bit precision.
+Addresses and X-register values use `bigint`, so 64-bit precision is never
+silently lost.
 
 ## Engine API
 
-The simulator under `src/arm64` has no React or Electron dependency:
+The engine under `src/arm64` has no React, browser, or Electron dependency:
 
 ```ts
 import { ARM64CPU } from './src/arm64/interpreter';
@@ -158,29 +222,26 @@ cpu.step();
 console.log(cpu.registers.x0); // 10n
 ```
 
+Guide mini-labs, challenges, and the full Lab all use this same engine.
+
 ## Project structure
 
 ```text
 src/
-  arm64/
-    cpu.ts
-    registers.ts
-    memory.ts
-    parser.ts
-    interpreter.ts
-    instructions/
-      arithmetic.ts
-      memory.ts
-      comparison.ts
-      branches.ts
-      syscalls.ts
+  arm64/                 parser, registers, memory, CPU, instructions
   components/
-  examples/
-electron/
+    learning/            lessons, quizzes, examples, embedded mini-labs
+    visualization/       snapshot-derived animated diagrams
+  learning/              lesson/challenge data and local progress
+  pages/                 Guide and Challenges routes
+  examples/              built-in Lab programs
+  App.tsx                 existing full simulator at /lab
+  RouterApp.tsx           browser/Electron routing shell
+electron/                 desktop entry and runtime smoke checks
 ```
 
-The parser and interpreter own assembly semantics. React consumes snapshots and
-step results, keeping presentation separate from CPU behavior.
+The parser and CPU own instruction semantics. React consumes immutable
+snapshots and step results, keeping presentation separate from execution.
 
 ## Validation
 
@@ -188,21 +249,25 @@ step results, keeping presentation separate from CPU behavior.
 npm test
 npm run typecheck
 npm run build
+npm run browser:smoke
 npm run electron:smoke
+npm run learning:smoke
 ```
 
-The automated suite covers arithmetic, memory, stack addressing, W/X semantics,
-labels, branches, BL/RET, flags, history, data directives, string escapes,
-entry-point resolution, and Linux write/exit syscalls.
+`npm run build` creates a browser build with refresh-safe nested route assets.
+`npm run build:electron` creates the relative-asset build used with `file://`.
+
+The automated suite covers the original CPU behavior plus lesson programs,
+quiz scoring, progress persistence, routes, Guide-to-Lab transfer, semantic
+challenge verification, live forward/back visual transitions, responsive
+layout, direct-route refreshes, and Electron rendering.
 
 ## Deliberate simplifications
 
 A64 Lab has no instruction decoder, MMU, exception levels, pipeline, device
-model, host syscall access, or complete AArch64 instruction set. Unsupported
-syntax produces a line-numbered parser error.
-
-The goal is clarity: learn the state changes that matter before moving to native
-tooling such as GDB, LLDB, Frida, and real Android binaries.
+model, host syscall access, or complete AArch64 instruction set. It teaches a
+small practical subset clearly before you move to real native tools and
+binaries.
 
 ## License
 

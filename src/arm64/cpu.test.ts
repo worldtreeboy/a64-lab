@@ -174,6 +174,34 @@ describe('ARM64CPU Phase 1', () => {
     expect(cpu.registers.x2).toBe(BigInt(expected));
   });
 
+  it('records the actual conditional decision even when the target is fallthrough', () => {
+    const taken = new ARM64CPU();
+    taken.loadProgram(`mov x0, 5
+cmp x0, #5
+b.eq adjacent
+adjacent:
+mov x1, 1`);
+    taken.step();
+    taken.step();
+    taken.step();
+    expect(taken.lastBranchTaken).toBe(true);
+    taken.step();
+    expect(taken.lastBranchTaken).toBeNull();
+    expect(taken.stepBack()).toBe(true);
+    expect(taken.lastBranchTaken).toBe(true);
+
+    const notTaken = new ARM64CPU();
+    notTaken.loadProgram(`mov x0, 4
+cmp x0, #5
+b.eq adjacent
+adjacent:
+mov x1, 1`);
+    notTaken.step();
+    notTaken.step();
+    notTaken.step();
+    expect(notTaken.lastBranchTaken).toBe(false);
+  });
+
   it('sets Z for TST and supports a not-taken branch', () => {
     const cpu = run(`
       mov x0, 0b0

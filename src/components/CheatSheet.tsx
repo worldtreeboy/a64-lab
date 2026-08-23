@@ -1,21 +1,27 @@
 const registerFacts = [
-  ['X0–X7', 'function arguments'],
+  ['X0–X7', 'arguments'],
   ['X0', 'return value'],
-  ['X29', 'Frame Pointer (FP)'],
-  ['X30', 'Link Register (LR)'],
-  ['SP', 'Stack Pointer'],
-  ['PC', 'current instruction'],
+  ['X29', 'FP'],
+  ['X30', 'LR'],
+  ['SP', 'stack pointer'],
+  ['PC', 'instruction address'],
 ];
 
 const instructions = [
-  ['MOV', 'move value'],
-  ['LDR / STR', 'load / store memory'],
-  ['ADD / SUB', 'arithmetic'],
-  ['CMP / TST', 'set NZCV flags'],
+  ['MOV', 'move/copy value'],
+  ['ADD', 'addition'],
+  ['SUB', 'subtraction'],
+  ['LDR', 'load from memory'],
+  ['STR', 'store to memory'],
+  ['LDP', 'load pair'],
+  ['STP', 'store pair'],
+  ['CMP', 'compare'],
   ['B', 'branch'],
-  ['BL', 'branch + save return in X30'],
-  ['RET', 'return using X30'],
-  ['SVC', 'Linux system call'],
+  ['BL', 'call'],
+  ['RET', 'return'],
+  ['BR', 'indirect jump'],
+  ['BLR', 'indirect call'],
+  ['SVC', 'system call'],
 ];
 
 export function CheatSheet() {

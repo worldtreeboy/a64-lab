@@ -49,6 +49,7 @@ export interface CPUSnapshot {
   exitCode: bigint | null;
   halted: boolean;
   lastExplanation: string;
+  lastBranchTaken: boolean | null;
   changedMemory: bigint[];
   historyDepth: number;
 }
@@ -75,6 +76,7 @@ export class ARM64CPU {
   public program: ParsedProgram = EMPTY_PROGRAM;
   public halted = true;
   public lastExplanation = 'Load a program, then press Step.';
+  public lastBranchTaken: boolean | null = null;
   public changedMemory: bigint[] = [];
   public terminalOutput = '';
   public lastSyscall: SyscallInfo | null = null;
@@ -101,6 +103,7 @@ export class ARM64CPU {
     this.lastSyscall = null;
     this.exited = false;
     this.exitCode = null;
+    this.lastBranchTaken = null;
     this.history = [];
     const rootName = this.labelAtAddress(this.program.entryPoint) ?? '_start';
     this.callStack = [{ name: rootName, address: this.program.entryPoint, returnAddress: null, arguments: [] }];
@@ -174,6 +177,7 @@ export class ARM64CPU {
     const instruction = this.currentInstruction;
     if (!instruction) {
       this.halted = true;
+      this.lastBranchTaken = null;
       this.lastExplanation = 'Program complete.';
       return {
         executed: null,
@@ -192,6 +196,7 @@ export class ARM64CPU {
     let changedFlags: FlagName[] = [];
     let explanation = '';
     let nextPC = instruction.address + 4n;
+    this.lastBranchTaken = null;
 
     if (instruction.opcode === 'mov' || instruction.opcode === 'add' || instruction.opcode === 'sub') {
       const effect = executeArithmetic(instruction, this.registers);
@@ -224,6 +229,7 @@ export class ARM64CPU {
       changedRegisters = effect.changedRegisters;
       nextPC = effect.nextPC;
       explanation = effect.explanation;
+      this.lastBranchTaken = effect.conditionTaken;
       if (effect.call) this.callStack.push({ ...effect.call });
       if (effect.returning && this.callStack.length > 1) this.callStack.pop();
     }
@@ -262,6 +268,7 @@ export class ARM64CPU {
       exitCode: this.exitCode,
       halted: this.halted,
       lastExplanation: this.lastExplanation,
+      lastBranchTaken: this.lastBranchTaken,
       changedMemory: [...this.changedMemory],
     };
   }
@@ -279,6 +286,7 @@ export class ARM64CPU {
     this.exitCode = snapshot.exitCode;
     this.halted = snapshot.halted;
     this.lastExplanation = snapshot.lastExplanation;
+    this.lastBranchTaken = snapshot.lastBranchTaken;
     this.changedMemory = [...snapshot.changedMemory];
   }
 }

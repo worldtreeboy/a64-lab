@@ -22,6 +22,7 @@ export interface BranchEffect {
   explanation: string;
   call: CallEffect | null;
   returning: boolean;
+  conditionTaken: boolean | null;
 }
 
 function conditionPassed(opcode: string, flags: CPUFlags): boolean {
@@ -50,6 +51,7 @@ export function executeBranch(
     explanation: '',
     call: null,
     returning: false,
+    conditionTaken: null,
   };
 
   if (instruction.opcode === 'ret') {
@@ -81,7 +83,11 @@ export function executeBranch(
   const labelOperand = instruction.operands[0] as LabelOperand;
   const target = labels.get(labelOperand.name)!;
   if (instruction.opcode.startsWith('b.') && !conditionPassed(instruction.opcode, flags)) {
-    return { ...base, explanation: `${instruction.opcode.toUpperCase()} condition is false; continue.` };
+    return {
+      ...base,
+      explanation: `${instruction.opcode.toUpperCase()} condition is false; continue.`,
+      conditionTaken: false,
+    };
   }
   if (instruction.opcode === 'bl') {
     writeRegister(registers, 'x30', defaultNext);
@@ -101,6 +107,7 @@ export function executeBranch(
   return {
     ...base,
     nextPC: target,
+    conditionTaken: instruction.opcode.startsWith('b.') ? true : null,
     explanation: instruction.opcode === 'b'
       ? `Branch to ${labelOperand.name}.`
       : `${instruction.opcode.toUpperCase()} condition is true; branch to ${labelOperand.name}.`,

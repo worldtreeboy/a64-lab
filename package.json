@@ -30,24 +30,31 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:electron": "tsc -b && vite build --mode electron",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "electron:smoke": "npm run build && electron electron/smoke.cjs"
+    "electron:smoke": "npm run build:electron && electron electron/smoke.cjs",
+    "learning:smoke": "npm run build:electron && electron electron/learning-smoke.cjs",
+    "browser:smoke": "npm run build && concurrently -k -s first \"vite preview --host 127.0.0.1 --port 4173 --strictPort\" \"wait-on http://127.0.0.1:4173 && electron electron/browser-smoke.cjs http://127.0.0.1:4173\""
   },
   "dependencies": {
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "concurrently": "^10.0.5",
     "electron": "^43.4.1",
+    "jsdom": "^30.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
