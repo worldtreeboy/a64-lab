@@ -15,7 +15,7 @@ import {
   PROGRESS_STORAGE_KEY,
   type LearningProgress,
 } from './progress';
-import type { CodeChallenge, QuizQuestion } from './types';
+import type { CodeChallenge, Lesson, QuizQuestion } from './types';
 
 const setTheme = vi.fn();
 
@@ -45,6 +45,33 @@ async function stepLiveDemo(user: ReturnType<typeof userEvent.setup>, count = 1)
   const demo = currentLiveDemo();
   const step = within(demo).getByRole('button', { name: 'Step' });
   for (let index = 0; index < count; index += 1) await user.click(step);
+}
+
+function questionCard(question: QuizQuestion): HTMLElement {
+  const card = screen.getByRole('heading', { name: question.prompt }).closest('section');
+  if (!card) throw new Error(`Question card not found: ${question.id}`);
+  return card;
+}
+
+async function submitQuestion(
+  user: ReturnType<typeof userEvent.setup>,
+  question: QuizQuestion,
+  optionId: string,
+) {
+  const option = question.options.find((candidate) => candidate.id === optionId);
+  if (!option) throw new Error(`Option ${optionId} not found for ${question.id}`);
+  const card = questionCard(question);
+  await user.click(within(card).getByRole('radio', { name: option.label }));
+  await user.click(within(card).getByRole('button', { name: 'Submit' }));
+}
+
+async function answerEveryQuestionCorrectly(
+  user: ReturnType<typeof userEvent.setup>,
+  lesson: Lesson,
+) {
+  for (const question of lesson.quiz) {
+    await submitQuestion(user, question, question.correctOptionId);
+  }
 }
 
 beforeEach(() => {
@@ -344,10 +371,7 @@ describe('Guide and Lab integration', () => {
     if (!lesson?.labProgram) throw new Error('Registers lesson has no lab program');
     renderRoutes(['/guide/registers']);
 
-    const quizHeading = screen.getByRole('heading', { name: 'Predict before revealing' });
-    const quiz = quizHeading.closest('section');
-    if (!quiz) throw new Error('Lesson quiz not found');
-    await user.click(within(quiz).getByRole('button', { name: /Try in Lab/ }));
+    await user.click(within(questionCard(lesson.quiz[0])).getByRole('button', { name: /Try in Lab/ }));
 
     const editor = screen.getByRole('textbox', { name: 'ARM64 assembly source' }) as HTMLTextAreaElement;
     expect(editor.value).toBe(lesson.labProgram);
@@ -366,14 +390,11 @@ describe('Guide and Lab integration', () => {
     const user = userEvent.setup();
     const lesson = getLesson('function-return');
     if (!lesson) throw new Error('Function return lesson not found');
-    const question = lesson.quiz[0];
-    const correctOption = question.options.find((option) => option.id === question.correctOptionId);
-    if (!correctOption) throw new Error('Function return quiz has no correct option');
     renderRoutes(['/guide/function-return']);
 
-    await user.click(screen.getByRole('radio', { name: correctOption.label }));
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
-    expect(screen.getByRole('status').textContent).toContain('Correct.');
+    await answerEveryQuestionCorrectly(user, lesson);
+    expect(screen.getAllByRole('status').filter((status) => status.textContent?.includes('Correct.')))
+      .toHaveLength(lesson.quiz.length);
     await user.click(screen.getAllByRole('button', { name: /Try in Lab/ })[0]);
 
     const step = screen.getByRole('button', { name: /Step/ });
@@ -391,36 +412,102 @@ describe('Guide and Lab integration', () => {
 
     await user.click(screen.getByRole('link', { name: `← Return to ${lesson.title} lesson` }));
     expect(screen.getByRole('heading', { name: lesson.title, level: 2 })).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Mark Complete' }));
+    const markComplete = screen.getByRole('button', { name: 'Mark Complete' }) as HTMLButtonElement;
+    expect(markComplete.disabled).toBe(false);
+    await user.click(markComplete);
     await waitFor(() => expect(storedProgress().completedLessons).toContain('function-return'));
   });
 });
 
 describe('lesson completion persistence', () => {
-  it('persists completion, celebrates it, and lets the learner unmark it', async () => {
+  it('keeps completion locked after wrong and revealed answers, then unlocks after every correct retry', async () => {
     const user = userEvent.setup();
-    const firstRender = renderRoutes(['/guide/registers']);
+    const lesson = getLesson('registers');
+    if (!lesson || lesson.quiz.length < 2) throw new Error('Registers needs at least two questions');
+    renderRoutes(['/guide/registers']);
     await waitFor(() => expect(storedProgress().completedLessons).toEqual([]));
 
     const markComplete = screen.getByRole('button', { name: 'Mark Complete' }) as HTMLButtonElement;
+    expect(markComplete.disabled).toBe(true);
+    expect(questionCard(lesson.quiz[0]).textContent).toContain(`QUESTION 1 OF ${lesson.quiz.length}`);
+    expect(questionCard(lesson.quiz[1]).textContent).toContain(`QUESTION 2 OF ${lesson.quiz.length}`);
+    expect(screen.getByText(`0 / ${lesson.quiz.length} questions correct. Answer every question correctly to unlock lesson completion.`)).toBeTruthy();
+
+    const firstQuestion = lesson.quiz[0];
+    const wrongOption = firstQuestion.options.find((option) => option.id !== firstQuestion.correctOptionId);
+    if (!wrongOption) throw new Error('First question needs a distractor');
+    await submitQuestion(user, firstQuestion, wrongOption.id);
+    expect(within(questionCard(firstQuestion)).getByRole('status').textContent).toContain('Not quite.');
+
+    const secondQuestion = lesson.quiz[1];
+    await user.click(within(questionCard(secondQuestion)).getByRole('button', { name: 'Reveal answer' }));
+    expect(within(questionCard(secondQuestion)).getByRole('status').textContent).toContain('Answer revealed.');
+    expect(markComplete.disabled).toBe(true);
+    await waitFor(() => {
+      expect(storedProgress().quizResults[`${lesson.id}:${firstQuestion.id}`]?.correct).toBe(false);
+      expect(storedProgress().quizResults[`${lesson.id}:${secondQuestion.id}`]).toBeUndefined();
+      expect(storedProgress().completedLessons).not.toContain(lesson.id);
+    });
+
+    await user.click(within(questionCard(firstQuestion)).getByRole('button', { name: 'Retry' }));
+    await submitQuestion(user, firstQuestion, firstQuestion.correctOptionId);
+    expect(markComplete.disabled).toBe(true);
+    expect(screen.getByText(`1 / ${lesson.quiz.length} questions correct. Answer every question correctly to unlock lesson completion.`)).toBeTruthy();
+
+    await user.click(within(questionCard(secondQuestion)).getByRole('button', { name: 'Retry' }));
+    await submitQuestion(user, secondQuestion, secondQuestion.correctOptionId);
     expect(markComplete.disabled).toBe(false);
-    await user.click(markComplete);
-    await waitFor(() => expect(storedProgress().completedLessons).toContain('registers'));
-    expect(screen.getByText('Lesson complete!')).toBeTruthy();
-    const unmark = screen.getByRole('button', { name: 'Unmark Complete' }) as HTMLButtonElement;
-    expect(unmark.disabled).toBe(false);
-    expect(unmark.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText(`${lesson.quiz.length} / ${lesson.quiz.length} questions correct. You can now mark this lesson complete.`)).toBeTruthy();
+  });
+
+  it('persists quiz unlock and lesson completion across remounts', async () => {
+    const user = userEvent.setup();
+    const lesson = getLesson('registers');
+    if (!lesson) throw new Error('Registers lesson is missing');
+    const firstRender = renderRoutes(['/guide/registers']);
+    await answerEveryQuestionCorrectly(user, lesson);
+    await waitFor(() => {
+      for (const question of lesson.quiz) {
+        expect(storedProgress().quizResults[`${lesson.id}:${question.id}`]?.correct).toBe(true);
+      }
+    });
 
     firstRender.unmount();
     renderRoutes(['/guide/registers']);
-    const persistedUnmark = screen.getByRole('button', { name: 'Unmark Complete' });
-    await user.click(persistedUnmark);
-    await waitFor(() => expect(storedProgress().completedLessons).not.toContain('registers'));
-    expect(screen.getByRole('button', { name: 'Mark Complete' }).getAttribute('aria-pressed')).toBe('false');
-
-    await user.click(screen.getByRole('button', { name: 'Mark Complete' }));
-    await waitFor(() => expect(storedProgress().completedLessons).toContain('registers'));
+    const persistedMark = screen.getByRole('button', { name: 'Mark Complete' }) as HTMLButtonElement;
+    expect(persistedMark.disabled).toBe(false);
+    await user.click(persistedMark);
+    await waitFor(() => expect(storedProgress().completedLessons).toContain(lesson.id));
     expect(screen.getByText('Lesson complete!')).toBeTruthy();
+
+    cleanup();
+    renderRoutes(['/guide/registers']);
+    const persistedUnmark = screen.getByRole('button', { name: 'Unmark Complete' }) as HTMLButtonElement;
+    expect(persistedUnmark.disabled).toBe(false);
+    expect(persistedUnmark.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('preserves a legacy completion without retroactive quiz gating, then gates it after unmarking', async () => {
+    const lesson = getLesson('registers');
+    if (!lesson) throw new Error('Registers lesson is missing');
+    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
+      completedLessons: [lesson.id],
+      quizResults: {},
+      completedChallenges: [],
+    }));
+    const user = userEvent.setup();
+    renderRoutes(['/guide/registers']);
+
+    const unmark = screen.getByRole('button', { name: 'Unmark Complete' }) as HTMLButtonElement;
+    expect(unmark.disabled).toBe(false);
+    expect(unmark.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('Your progress is saved on this device.')).toBeTruthy();
+
+    await user.click(unmark);
+    await waitFor(() => expect(storedProgress().completedLessons).not.toContain(lesson.id));
+    const markAgain = screen.getByRole('button', { name: 'Mark Complete' }) as HTMLButtonElement;
+    expect(markAgain.disabled).toBe(true);
+    expect(screen.getByText(`0 / ${lesson.quiz.length} questions correct. Answer every question correctly to unlock lesson completion.`)).toBeTruthy();
   });
 
   it('resets saved lesson, quiz, and challenge progress only after confirmation', async () => {

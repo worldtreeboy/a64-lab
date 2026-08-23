@@ -8,6 +8,8 @@ interface PredictionQuestionProps {
   lessonId?: string;
   lessonTitle?: string;
   labProgram?: string;
+  questionIndex?: number;
+  questionCount?: number;
   onCorrect?: () => void;
 }
 
@@ -16,6 +18,8 @@ export function PredictionQuestion({
   lessonId,
   lessonTitle,
   labProgram,
+  questionIndex,
+  questionCount,
   onCorrect,
 }: PredictionQuestionProps) {
   const groupId = useId();
@@ -41,7 +45,11 @@ export function PredictionQuestion({
 
   return (
     <section className="prediction-card" aria-labelledby={`${groupId}-title`}>
-      <span className="eyebrow">PREDICT THE RESULT</span>
+      <span className="eyebrow">
+        {questionIndex !== undefined && questionCount !== undefined
+          ? `QUESTION ${questionIndex + 1} OF ${questionCount}`
+          : 'PREDICT THE RESULT'}
+      </span>
       {question.code && <AssemblyCode code={question.code} label="Question assembly" />}
       <h3 id={`${groupId}-title`}>{question.prompt}</h3>
       <fieldset disabled={submitted || revealed}>

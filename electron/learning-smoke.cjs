@@ -44,6 +44,10 @@ app.whenReady().then(async () => {
       sections: document.querySelectorAll('.lesson-section').length,
       diagrams: document.querySelectorAll('.concept-diagram').length,
       examples: document.querySelectorAll('.assembly-example').length,
+      quizQuestions: document.querySelectorAll('.lesson-quiz .prediction-card').length,
+      numberedQuestions: [...document.querySelectorAll('.lesson-quiz .prediction-card > .eyebrow')]
+        .map((element) => element.textContent),
+      completionLocked: document.querySelector('.lesson-finish button:last-child')?.disabled === true,
       mentalModel: Boolean(document.querySelector('.lesson-mental-model')),
       walkthrough: Boolean(document.querySelector('.state-walkthrough')),
       liveVisualizer: Boolean(document.querySelector('.live-lesson-demo .dynamic-visualizer')),
@@ -112,6 +116,10 @@ app.whenReady().then(async () => {
       && guide.sections > 0
       && guide.diagrams > 0
       && guide.examples > 0
+      && guide.quizQuestions >= 2
+      && guide.numberedQuestions.length === guide.quizQuestions
+      && guide.numberedQuestions.every((label, index) => label === `QUESTION ${index + 1} OF ${guide.quizQuestions}`)
+      && guide.completionLocked
       && guide.mentalModel
       && guide.walkthrough
       && guide.liveVisualizer

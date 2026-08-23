@@ -60,9 +60,10 @@ at once:
 Lessons are deliberately concise—usually 5–15 focused minutes—and teach the
 expanded mental model before compact syntax. Each concept lesson introduces no
 more than two genuinely new ideas, shows a focused Before → Execute → After
-view, and ends with a bridge to the next idea. Completion can be marked or
-unmarked at any time, is saved locally, and gives a short reduced-motion-aware
-celebration.
+view, and ends with a bridge to the next idea. Every lesson has two focused
+questions, and both must be answered correctly before completion unlocks.
+Results and completion are saved locally, and finishing a lesson gives a short
+reduced-motion-aware celebration.
 
 ## Live visual learning
 
@@ -253,9 +254,10 @@ npm run learning:smoke
 `npm run build:electron` creates the relative-asset build used with `file://`.
 
 The automated suite covers the original CPU behavior plus lesson programs,
-quiz scoring, progress persistence, routes, Guide-to-Lab transfer, semantic
-challenge verification, live forward/back visual transitions, responsive
-layout, direct-route refreshes, and Electron rendering.
+multi-question completion gating, retries and answer reveals, progress
+persistence, routes, Guide-to-Lab transfer, semantic challenge verification,
+live forward/back visual transitions, responsive layout, direct-route
+refreshes, and Electron rendering.
 
 ## Deliberate simplifications
 

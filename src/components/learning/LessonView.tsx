@@ -26,6 +26,12 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
   const [celebrationId, setCelebrationId] = useState(0);
   const { progress, markLessonComplete, unmarkLessonComplete } = useProgress();
   const complete = progress.completedLessons.includes(lesson.id);
+  const correctQuestionCount = lesson.quiz.filter((question) => (
+    progress.quizResults[`${lesson.id}:${question.id}`]?.correct === true
+  )).length;
+  const allQuestionsCorrect = correctQuestionCount === lesson.quiz.length;
+  const canToggleCompletion = complete || allQuestionsCorrect;
+  const completionRequirementId = `completion-requirement-${lesson.id}`;
   const { previous, next } = getAdjacentLessons(lesson.id);
 
   useEffect(() => {
@@ -107,14 +113,16 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
       <section className="lesson-quiz" aria-labelledby={`quiz-${lesson.id}`}>
         <div className="lesson-section-heading">
           <span className="eyebrow">CHECK YOUR UNDERSTANDING</span>
-          <h3 id={`quiz-${lesson.id}`}>Predict before revealing</h3>
+          <h3 id={`quiz-${lesson.id}`}>Answer every question correctly</h3>
         </div>
-        {lesson.quiz.map((question) => (
+        {lesson.quiz.map((question, questionIndex) => (
           <PredictionQuestion
             question={question}
             lessonId={lesson.id}
             lessonTitle={lesson.title}
-            labProgram={lesson.labProgram}
+            labProgram={questionIndex === 0 ? lesson.labProgram : undefined}
+            questionIndex={questionIndex}
+            questionCount={lesson.quiz.length}
             key={question.id}
           />
         ))}
@@ -122,8 +130,14 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
 
       <section className="lesson-finish">
         <div>
-          <h3>{complete ? 'Lesson complete' : 'Ready to continue?'}</h3>
-          <p>{complete ? 'Your progress is saved on this device.' : 'Mark this lesson complete when you are comfortable with the core idea.'}</p>
+          <h3>{complete ? 'Lesson complete' : allQuestionsCorrect ? 'Ready to continue?' : 'Complete the questions first'}</h3>
+          <p id={completionRequirementId} role="status" aria-live="polite">
+            {complete
+              ? 'Your progress is saved on this device.'
+              : allQuestionsCorrect
+                ? `${correctQuestionCount} / ${lesson.quiz.length} questions correct. You can now mark this lesson complete.`
+                : `${correctQuestionCount} / ${lesson.quiz.length} questions correct. Answer every question correctly to unlock lesson completion.`}
+          </p>
         </div>
         <div className="lesson-finish-actions">
           {lesson.labProgram && (
@@ -137,11 +151,14 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
             className={`button ${complete ? 'button-secondary completion-toggle-complete' : 'button-primary'}`}
             type="button"
             aria-pressed={complete}
+            aria-describedby={completionRequirementId}
+            disabled={!canToggleCompletion}
             onClick={() => {
               if (complete) {
                 unmarkLessonComplete(lesson.id);
                 return;
               }
+              if (!allQuestionsCorrect) return;
               markLessonComplete(lesson.id);
               setCelebrationId((current) => current + 1);
             }}

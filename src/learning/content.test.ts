@@ -199,7 +199,14 @@ describe('lesson content', () => {
       expect(lesson.id).toMatch(ID_PATTERN);
       expect(lesson.sections.length, `${lesson.id} should stay short`).toBeGreaterThanOrEqual(2);
       expect(lesson.sections.length, `${lesson.id} should stay short`).toBeLessThanOrEqual(3);
-      expect(lesson.quiz, `${lesson.id} should have one prediction question`).toHaveLength(1);
+      expect(
+        lesson.quiz.length,
+        `${lesson.id} needs at least two questions so the learner checks the idea more than once`,
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        new Set(lesson.quiz.map((question) => question.prompt.trim())).size,
+        `${lesson.id} repeats a question prompt`,
+      ).toBe(lesson.quiz.length);
       expect(lesson.nextStep.length).toBeGreaterThan(20);
       expect(lesson.visualPrompt.trim().length, `${lesson.id} needs a visual teaching prompt`).toBeGreaterThanOrEqual(20);
       expect(lesson.visualFocus.length, `${lesson.id} needs a focused live visual`).toBeGreaterThan(0);
@@ -227,9 +234,19 @@ describe('lesson content', () => {
         expect(question.id).toMatch(ID_PATTERN);
         expect(quizIds.has(question.id), `duplicate quiz id: ${question.id}`).toBe(false);
         quizIds.add(question.id);
+        expect(question.prompt.trim().length, `${question.id} needs a useful prompt`).toBeGreaterThanOrEqual(10);
+        expect(question.correctOptionId, `${question.id} has an invalid answer id`).toMatch(ID_PATTERN);
         expect(question.options.length).toBeGreaterThanOrEqual(3);
         expect(question.options.length).toBeLessThanOrEqual(4);
         expect(new Set(question.options.map((option) => option.id)).size).toBe(question.options.length);
+        for (const option of question.options) {
+          expect(option.id, `${question.id} has an invalid option id`).toMatch(ID_PATTERN);
+          expect(option.label.trim().length, `${question.id}/${option.id} has an empty option`).toBeGreaterThan(0);
+        }
+        expect(
+          new Set(question.options.map((option) => option.label.trim())).size,
+          `${question.id} repeats an answer label`,
+        ).toBe(question.options.length);
         expect(
           question.options.some((option) => option.id === question.correctOptionId),
           `${question.id} has an unknown correct answer`,
@@ -261,7 +278,7 @@ describe('lesson content', () => {
     expect(getAdjacentLessons('missing')).toEqual({ previous: null, next: null });
   });
 
-  it('keeps every assembly section and quiz example self-contained and parseable', () => {
+  it('keeps every assembly section and quiz example self-contained, parseable, and finite', () => {
     for (const lesson of LESSONS) {
       for (const section of lesson.sections) {
         if (!section.code) continue;
@@ -275,6 +292,10 @@ describe('lesson content', () => {
         expect(
           () => parseProgram(question.code!),
           `${lesson.id}/${question.id} should contain self-contained ARM64 assembly`,
+        ).not.toThrow();
+        expect(
+          () => runProgram(question.code!),
+          `${lesson.id}/${question.id} should execute to completion`,
         ).not.toThrow();
       }
     }
