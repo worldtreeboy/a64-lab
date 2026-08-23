@@ -203,3 +203,7 @@ syntax produces a line-numbered parser error.
 
 The goal is clarity: learn the state changes that matter before moving to native
 tooling such as GDB, LLDB, Frida, and real Android binaries.
+
+## License
+
+Released under the [MIT License](LICENSE).

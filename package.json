@@ -4,6 +4,7 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Interactive AArch64 learning simulator for Android reversing and binary exploitation",
+  "license": "MIT",
   "author": "worldtreeboy",
   "repository": {
     "type": "git",
