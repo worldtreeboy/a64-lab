@@ -1,0 +1,55 @@
+{
+  "name": "a64-lab",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Interactive AArch64 learning simulator for Android reversing and binary exploitation",
+  "author": "worldtreeboy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/worldtreeboy/a64-lab.git"
+  },
+  "homepage": "https://github.com/worldtreeboy/a64-lab#readme",
+  "bugs": {
+    "url": "https://github.com/worldtreeboy/a64-lab/issues"
+  },
+  "keywords": [
+    "aarch64",
+    "arm64",
+    "assembly",
+    "reverse-engineering",
+    "binary-exploitation",
+    "education"
+  ],
+  "packageManager": "npm@10.9.8",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty false",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "electron:smoke": "npm run build && electron electron/smoke.cjs"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^10.0.5",
+    "electron": "^43.4.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
+    "wait-on": "^9.1.0"
+  }
+}
