@@ -9,6 +9,7 @@ import { ChallengeCard } from '../components/learning/ChallengeCard';
 import { AssemblyExample } from '../components/learning/AssemblyExample';
 import { PredictionQuestion } from '../components/learning/PredictionQuestion';
 import { CURRICULUM_STAGES } from './curriculum';
+import { formatLearnerText } from './learnerText';
 import { getLesson, LESSONS } from './lessons';
 import {
   ProgressProvider,
@@ -48,7 +49,9 @@ async function stepLiveDemo(user: ReturnType<typeof userEvent.setup>, count = 1)
 }
 
 function questionCard(question: QuizQuestion): HTMLElement {
-  const card = screen.getByRole('heading', { name: question.prompt }).closest('section');
+  const card = screen.getByRole('heading', {
+    name: formatLearnerText(question.prompt),
+  }).closest('section');
   if (!card) throw new Error(`Question card not found: ${question.id}`);
   return card;
 }
@@ -61,7 +64,9 @@ async function submitQuestion(
   const option = question.options.find((candidate) => candidate.id === optionId);
   if (!option) throw new Error(`Option ${optionId} not found for ${question.id}`);
   const card = questionCard(question);
-  await user.click(within(card).getByRole('radio', { name: option.label }));
+  await user.click(within(card).getByRole('radio', {
+    name: formatLearnerText(option.label),
+  }));
   await user.click(within(card).getByRole('button', { name: 'Submit' }));
 }
 
@@ -185,6 +190,23 @@ add x1, x0, #5`;
 });
 
 describe('learning routes and navigation', () => {
+  it('shows inline lesson terms with apostrophes instead of backticks', () => {
+    const arithmetic = renderRoutes(['/guide/mov-arithmetic']);
+    const lessonView = document.querySelector('.lesson-view');
+
+    expect(lessonView?.textContent).toContain("'add x2, x0, x1'");
+    expect(lessonView?.textContent).not.toContain('`add x2, x0, x1`');
+    arithmetic.unmount();
+
+    renderRoutes(['/guide/data-sections-strings']);
+    expect(screen.getByRole('heading', {
+      name: "Do '.data', '.text', or '.globl' consume an ARM64 instruction address?",
+    })).toBeTruthy();
+    expect(screen.getByRole('radio', {
+      name: "Only '.data' consumes an instruction",
+    })).toBeTruthy();
+  });
+
   it('renders /guide directly and navigates through the top-level routes', async () => {
     const user = userEvent.setup();
     renderRoutes(['/guide']);

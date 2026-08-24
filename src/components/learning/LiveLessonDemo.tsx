@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ARM64CPU } from '../../arm64/interpreter';
 import type { ParsedInstruction } from '../../arm64/parser';
 import { formatHex, type RegisterName } from '../../arm64/registers';
+import { formatLearnerText } from '../../learning/learnerText';
 import type { LessonFlagFocus, LessonVisualFocus } from '../../learning/types';
 import { DynamicVisualizer } from '../visualization/DynamicVisualizer';
 import { createVisualizationTransition, diffSnapshots } from '../visualization/transitions';
@@ -105,7 +106,7 @@ export function LiveLessonDemo({
         <div>
           <span className="eyebrow">WATCH THE REAL CPU STATE</span>
           <h3 id={headingId}>Step through this lesson</h3>
-          <p>{visualPrompt}</p>
+          <p>{formatLearnerText(visualPrompt)}</p>
         </div>
         <div className="live-demo-status">
           <span>{snapshot.halted ? 'Complete' : 'Ready'}</span>

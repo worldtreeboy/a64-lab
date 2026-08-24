@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { QuizQuestion } from '../../learning/types';
 import { useProgress } from '../../learning/progress';
+import { formatLearnerText } from '../../learning/learnerText';
 import { AssemblyCode, TryInLabButton } from './AssemblyExample';
 
 interface PredictionQuestionProps {
@@ -51,7 +52,7 @@ export function PredictionQuestion({
           : 'PREDICT THE RESULT'}
       </span>
       {question.code && <AssemblyCode code={question.code} label="Question assembly" />}
-      <h3 id={`${groupId}-title`}>{question.prompt}</h3>
+      <h3 id={`${groupId}-title`}>{formatLearnerText(question.prompt)}</h3>
       <fieldset disabled={submitted || revealed}>
         <legend className="sr-only">Choose one answer</legend>
         {question.options.map((option) => {
@@ -70,7 +71,7 @@ export function PredictionQuestion({
                 checked={selected === option.id}
                 onChange={() => setSelected(option.id)}
               />
-              <span>{option.label}</span>
+              <span>{formatLearnerText(option.label)}</span>
             </label>
           );
         })}
@@ -100,7 +101,7 @@ export function PredictionQuestion({
       {showAnswer && (
         <div className={`quiz-feedback ${submitted && correct ? 'correct' : revealed ? 'revealed' : 'incorrect'}`} role="status">
           <strong>{submitted ? correct ? 'Correct.' : 'Not quite.' : 'Answer revealed.'}</strong>
-          <span>{question.explanation}</span>
+          <span>{formatLearnerText(question.explanation)}</span>
         </div>
       )}
     </section>

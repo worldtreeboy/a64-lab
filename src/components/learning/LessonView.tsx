@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdjacentLessons } from '../../learning/lessons';
+import { formatLearnerText } from '../../learning/learnerText';
 import { useProgress } from '../../learning/progress';
 import type { Lesson } from '../../learning/types';
 import { AssemblyExample, TryInLabButton } from './AssemblyExample';
@@ -51,7 +52,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         <div>
           <span className="eyebrow">LESSON {lesson.order.toString().padStart(2, '0')}</span>
           <h2 ref={titleRef} tabIndex={-1}>{lesson.title}</h2>
-          <p>{lesson.description}</p>
+          <p>{formatLearnerText(lesson.description)}</p>
         </div>
         <span className="lesson-duration">{lesson.estimatedMinutes} min</span>
       </header>
@@ -60,7 +61,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         <span className="eyebrow">
           {lesson.kind === 'integration' ? 'PUTTING FAMILIAR IDEAS TOGETHER' : 'ONE NEW MENTAL MODEL'}
         </span>
-        <h3 id={`core-idea-${lesson.id}`}>{lesson.coreIdea}</h3>
+        <h3 id={`core-idea-${lesson.id}`}>{formatLearnerText(lesson.coreIdea)}</h3>
         <div className="lesson-concept-context">
           {lesson.buildsOn.length > 0 && (
             <p><strong>You already know</strong><span>{lesson.buildsOn.map(conceptLabel).join(' · ')}</span></p>
@@ -76,11 +77,15 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
 
       {lesson.sections.map((section) => (
         <section className="lesson-section" id={section.id} key={section.id}>
-          <h3>{section.title}</h3>
-          {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+          <h3>{formatLearnerText(section.title)}</h3>
+          {section.paragraphs.map((paragraph) => (
+            <p key={paragraph}>{formatLearnerText(paragraph)}</p>
+          ))}
           {section.bullets && (
             <ul>
-              {section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+              {section.bullets.map((bullet) => (
+                <li key={bullet}>{formatLearnerText(bullet)}</li>
+              ))}
             </ul>
           )}
           {section.diagram && <ConceptDiagram kind={section.diagram} />}
@@ -94,7 +99,9 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
             />
           )}
           {section.walkthrough && <StateWalkthrough walkthrough={section.walkthrough} />}
-          {section.callout && <div className="lesson-callout">{section.callout}</div>}
+          {section.callout && (
+            <div className="lesson-callout">{formatLearnerText(section.callout)}</div>
+          )}
         </section>
       ))}
 
@@ -185,7 +192,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
 
       <aside className="lesson-transition" aria-label="What comes next">
         <span className="eyebrow">CONNECT THE IDEAS</span>
-        <p>{lesson.nextStep}</p>
+        <p>{formatLearnerText(lesson.nextStep)}</p>
       </aside>
 
       <nav className="lesson-navigation" aria-label="Lesson navigation">

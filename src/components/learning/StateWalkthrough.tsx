@@ -1,4 +1,5 @@
 import type { StateWalkthroughContent } from '../../learning/types';
+import { formatLearnerText } from '../../learning/learnerText';
 
 interface StateWalkthroughProps {
   walkthrough: StateWalkthroughContent;
@@ -7,7 +8,9 @@ interface StateWalkthroughProps {
 function StateList({ values }: { values: readonly string[] }) {
   return (
     <ul>
-      {values.map((value, index) => <li key={`${index}-${value}`}>{value}</li>)}
+      {values.map((value, index) => (
+        <li key={`${index}-${value}`}>{formatLearnerText(value)}</li>
+      ))}
     </ul>
   );
 }
