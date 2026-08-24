@@ -70,7 +70,7 @@ reduced-motion-aware celebration.
 The diagrams in the Lab and lesson mini-labs are generated from before/after
 snapshots of the existing ARM64 engine. There is no second animation-only CPU.
 
-After Step, Run, Previous, or Reset, the visual layer can show:
+After Step, Run, Step Back, or Reset, the visual layer can show:
 
 - register values moving from old to new;
 - ADD/SUB and load/store data flow;
@@ -81,16 +81,31 @@ After Step, Run, Previous, or Reset, the visual layer can show:
 - BL updating PC and X30/LR;
 - nested call-stack growth and RET returning to the caller.
 
-Animations last only a few hundred milliseconds and respect reduced-motion
-preferences.
+State-change animations are brief; the Cyberpunk HUD adds slow ambient glass
+and data-flow motion. All motion respects reduced-motion preferences and
+pauses while the window is inactive.
 
 ![A64 Lab debugger with live register, data-flow, and stack visualization](docs/a64-lab.png)
 
+## Themes and motion
+
+**Cyberpunk HUD** is the default theme and appears first in the theme picker.
+It uses translucent smoked-glass panels, refractive cyan/violet/magenta edges,
+slow depth-grid motion, scanner light, and short state-change effects. Two
+quieter alternatives remain available:
+
+- **Debugger** — a restrained dark debugger palette;
+- **Black / White** — a high-contrast monochrome presentation.
+
+Your selection is saved locally for later sessions. Ambient animation pauses
+when the page or Electron window is inactive, and the app disables nonessential
+motion when the operating system requests reduced motion.
+
 ## Simulator highlights
 
-- X0–X30, W0–W30, SP, PC, FP/LR aliases, and NZCV flags
+- X0–X30, W0–W30, SP, PC, X29/FP and X30/LR display labels, and NZCV flags
 - Correct W-register zero-extension into its paired X register
-- Step, Run, Reset, and complete-state Previous
+- Step, Run, Reset, and complete-snapshot Step Back
 - Register, flag, stack, and memory change highlighting
 - Sparse byte-addressable, little-endian memory
 - Stack and hex/ASCII memory viewers
@@ -98,7 +113,7 @@ preferences.
 - Labels, conditional branches, BL/RET, BR/BLR, and a call-stack panel
 - GNU-style `.text`, `.data`, strings, symbols, and `ldr xN, =label`
 - Simplified Linux AArch64 `write` and `exit` syscalls
-- Terminal output, five built-in examples, and three saved visual themes
+- Terminal output, five core examples, a little-endian demo, and three saved visual themes with Cyberpunk HUD as the default
 - A React-independent TypeScript simulation engine
 
 ## Quick start

@@ -7,6 +7,7 @@ import { ARM64Memory, type MemorySnapshot } from './memory';
 import { parseProgram, type ParsedInstruction, type ParsedProgram } from './parser';
 import {
   STACK_TOP,
+  X_REGISTER_NAMES,
   cloneRegisters,
   createRegisterState,
   type RegisterName,
@@ -105,7 +106,9 @@ export class ARM64CPU {
     this.exitCode = null;
     this.lastBranchTaken = null;
     this.history = [];
-    const rootName = this.labelAtAddress(this.program.entryPoint) ?? '_start';
+    const rootName = this.program.codeLabels.has('_start')
+      ? '_start'
+      : this.labelAtAddress(this.program.entryPoint) ?? '_start';
     this.callStack = [{ name: rootName, address: this.program.entryPoint, returnAddress: null, arguments: [] }];
     this.halted = this.currentInstruction === null;
     this.lastExplanation = this.halted
@@ -159,7 +162,8 @@ export class ARM64CPU {
     );
     if (exactDataSymbol) return exactDataSymbol.name;
     const codeLabel = this.labelAtAddress(address);
-    return codeLabel ? `code → ${codeLabel}` : null;
+    if (codeLabel) return `code → ${codeLabel}`;
+    return this.memory.hasStoredByte(address) ? 'simulated memory' : null;
   }
 
   get canStepBack(): boolean {
@@ -189,9 +193,9 @@ export class ARM64CPU {
       };
     }
 
-    this.history.push(this.capture());
+    const before = this.capture();
+    this.history.push(before);
 
-    let changedRegisters: RegisterName[] = [];
     let changedMemory: bigint[] = [];
     let changedFlags: FlagName[] = [];
     let explanation = '';
@@ -200,11 +204,9 @@ export class ARM64CPU {
 
     if (instruction.opcode === 'mov' || instruction.opcode === 'add' || instruction.opcode === 'sub') {
       const effect = executeArithmetic(instruction, this.registers);
-      changedRegisters = effect.changedRegisters;
       explanation = effect.explanation;
     } else if (['ldr', 'str', 'ldrb', 'strb', 'ldp', 'stp'].includes(instruction.opcode)) {
       const effect = executeMemory(instruction, this.registers, this.memory, this.program.labels);
-      changedRegisters = effect.changedRegisters;
       changedMemory = effect.changedMemory;
       explanation = effect.explanation;
     } else if (instruction.opcode === 'cmp' || instruction.opcode === 'tst') {
@@ -226,7 +228,6 @@ export class ARM64CPU {
         this.program.labels,
         (address) => this.labelAtAddress(address),
       );
-      changedRegisters = effect.changedRegisters;
       nextPC = effect.nextPC;
       explanation = effect.explanation;
       this.lastBranchTaken = effect.conditionTaken;
@@ -238,7 +239,8 @@ export class ARM64CPU {
     this.changedMemory = changedMemory;
     this.halted = this.exited || this.currentInstruction === null;
     this.lastExplanation = explanation;
-    changedRegisters = [...new Set([...changedRegisters, 'pc' as RegisterName])];
+    const changedRegisters = ([...X_REGISTER_NAMES, 'sp', 'pc'] as RegisterName[])
+      .filter((name) => before.registers[name] !== this.registers[name]);
 
     return {
       executed: instruction,

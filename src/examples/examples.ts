@@ -85,6 +85,15 @@ _start:
     mov x0, 0
     svc 0`,
   },
+  {
+    id: 'little-endian',
+    name: 'Bonus — Little-endian memory',
+    description: 'Store one 64-bit value and inspect its bytes from low to high address.',
+    source: `mov x0, 0x1122334455667788
+mov x1, 0x400000
+str x0, [x1]
+ldr x2, [x1]`,
+  },
 ];
 
 export const DEFAULT_SOURCE = BEGINNER_EXAMPLES[0].source;

@@ -33,6 +33,8 @@ str x0, [sp]`);
     view.rerender(<DynamicVisualizer transition={stepTransition(cpu)} />);
     expect(screen.getByLabelText(/SP moved from/)).toBeTruthy();
     expect(screen.getByText('−16 bytes')).toBeTruthy();
+    expect(screen.getAllByText('current area')).toHaveLength(2);
+    expect(screen.getByText(/Changing SP alone does not modify memory bytes/)).toBeTruthy();
 
     view.rerender(<DynamicVisualizer transition={stepTransition(cpu)} />);
     const stack = screen.getByTestId('dynamic-stack');
@@ -54,7 +56,7 @@ str x0, [sp]`);
         )}
       />,
     );
-    expect(screen.getByText('Previous · undo STR')).toBeTruthy();
+    expect(screen.getByText('Step Back · undo STR')).toBeTruthy();
     expect(screen.getByTestId('dynamic-stack').querySelector('.dv-stack-changed')).toBeTruthy();
   });
 
@@ -126,5 +128,175 @@ add x2, x0, x1`);
     expect(screen.getByText('Run completed')).toBeTruthy();
     expect(screen.queryByLabelText('ADD data flow')).toBeNull();
     expect(screen.getByText('0x000000000000001E')).toBeTruthy();
+  });
+
+  it('does not call an unfinished, step-limited Run complete', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram('loop: b loop');
+    const before = cpu.snapshot();
+    const instruction = cpu.step().executed;
+    const after = cpu.snapshot();
+
+    render(
+      <DynamicVisualizer
+        transition={createVisualizationTransition(before, after, instruction, 'run')}
+      />,
+    );
+
+    expect(screen.getByText('Run paused at the step limit')).toBeTruthy();
+    expect(screen.queryByText('Run completed')).toBeNull();
+  });
+
+  it('uses the Run snapshot diff instead of calculating the final LDR address from pre-Run registers', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x1, 0x400000
+mov x0, 0x1122334455667788
+str x0, [x1]
+ldr x2, [x1]`);
+    const before = cpu.snapshot();
+    let finalInstruction = null;
+    while (!cpu.halted) finalInstruction = cpu.step().executed ?? finalInstruction;
+    const after = cpu.snapshot();
+
+    const { container } = render(
+      <DynamicVisualizer
+        transition={createVisualizationTransition(before, after, finalInstruction, 'run')}
+        focus={['memory']}
+      />,
+    );
+    const byteCard = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(byteCard).getByText('Memory changed during Run')).toBeTruthy();
+    expect(within(byteCard).getByText('RUN CHANGES · 8 bytes')).toBeTruthy();
+    expect(within(byteCard).getAllByText('0x0000000000400000').length).toBeGreaterThan(0);
+    expect(within(byteCard).queryByText('LDR · 8 bytes')).toBeNull();
+    expect([...container.querySelectorAll('.dv-byte-strip code')].map((node) => node.textContent))
+      .toEqual(['88', '77', '66', '55', '44', '33', '22', '11']);
+  });
+
+  it('shows little-endian bytes from low to high address after STR', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x0, 0x1122334455667788
+mov x1, 0x400000
+str x0, [x1]`);
+    cpu.step();
+    cpu.step();
+
+    const { container } = render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['memory']} />);
+    const byteCard = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(byteCard).getByText('low address → high address')).toBeTruthy();
+    const bytes = [...container.querySelectorAll('.dv-byte-strip code')]
+      .map((element) => element.textContent);
+    expect(bytes).toEqual(['88', '77', '66', '55', '44', '33', '22', '11']);
+    expect(within(byteCard).getByText('0x1122334455667788')).toBeTruthy();
+  });
+
+  it('shows all sixteen STP bytes and labels their Step Back state as restored', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x29, 0x1122334455667788
+mov x30, 0x99aabbccddeeff00
+stp x29, x30, [sp, #-16]!`);
+    cpu.step();
+    cpu.step();
+
+    const view = render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['memory']} />);
+    let byteCard = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(byteCard).getByText('STP · 16 bytes')).toBeTruthy();
+    expect(view.container.querySelectorAll('.dv-byte-strip code')).toHaveLength(16);
+
+    const beforeRewind = cpu.snapshot();
+    expect(cpu.stepBack()).toBe(true);
+    const afterRewind = cpu.snapshot();
+    view.rerender(
+      <DynamicVisualizer
+        transition={createVisualizationTransition(
+          beforeRewind,
+          afterRewind,
+          cpu.currentInstruction,
+          'back',
+          diffSnapshots(beforeRewind, afterRewind),
+        )}
+        focus={['memory']}
+      />,
+    );
+    byteCard = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(byteCard).getByText('Memory restored by Step Back')).toBeTruthy();
+    expect(within(byteCard).getByText('RESTORED · 16 bytes')).toBeTruthy();
+    expect(within(byteCard).queryByText('STP · 16 bytes')).toBeNull();
+    expect(view.container.querySelectorAll('.dv-byte-strip code')).toHaveLength(16);
+  });
+
+  it('shows both eight-byte reads in a sixteen-byte LDP', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x29, 0x1122334455667788
+mov x30, 0x99aabbccddeeff00
+stp x29, x30, [sp, #-16]!
+ldp x0, x1, [sp]`);
+    cpu.step();
+    cpu.step();
+    cpu.step();
+
+    const view = render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['memory']} />);
+    const byteCard = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(byteCard).getByText('LDP · 16 bytes')).toBeTruthy();
+    expect(view.container.querySelectorAll('.dv-byte-strip code')).toHaveLength(16);
+  });
+
+  it('explains that raising SP makes rows reusable without erasing their bytes', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x0, 42
+sub sp, sp, #16
+str x0, [sp]
+add sp, sp, #16`);
+    cpu.step();
+    cpu.step();
+    cpu.step();
+
+    render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['stack']} />);
+    const stack = screen.getByTestId('dynamic-stack');
+    expect(within(stack).getAllByText('may be reused')).toHaveLength(2);
+    expect(within(stack).getByText(/stored bytes remain until later code overwrites them/i)).toBeTruthy();
+    expect(within(stack).getAllByText('0x000000000000002A').length).toBeGreaterThan(0);
+  });
+
+  it('marks the exact offset when SP is not aligned to an eight-byte row', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram('sub sp, sp, #1');
+
+    render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['stack']} />);
+    const marker = within(screen.getByTestId('dynamic-stack')).getByText('SP at row +7');
+    expect(marker.getAttribute('title')).toBe('SP = 0x00007FFFFFFFDFFF');
+  });
+
+  it('uses wrapped 64-bit effective addresses in the memory-byte view', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x1, 0xfffffffffffffff8
+mov x0, 42
+str x0, [x1, #8]`);
+    cpu.step();
+    cpu.step();
+
+    render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['memory']} />);
+    const bytes = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(bytes).getAllByText('0x0000000000000000').length).toBeGreaterThan(0);
+    expect(within(bytes).queryByText('0x000000000000002A')).toBeTruthy();
+    expect(within(bytes).queryByText('0x0000000100000000')).toBeNull();
+  });
+
+  it('describes little-endian order accurately when one access crosses the 64-bit boundary', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x1, 0xfffffffffffffffc
+mov x0, 0x1122334455667788
+str x0, [x1]`);
+    cpu.step();
+    cpu.step();
+
+    const view = render(<DynamicVisualizer transition={stepTransition(cpu)} focus={['memory']} />);
+    const bytes = screen.getByTestId('dynamic-memory-bytes');
+    expect(within(bytes).getByText('Address order wraps from 0xFFFF… to zero')).toBeTruthy();
+    expect(bytes.textContent).toContain('least-significant byte at the effective address');
+    expect(bytes.textContent).toContain('Following bytes use increasing addresses and wrap to zero');
+    expect(bytes.textContent).not.toContain('least-significant byte at the lowest address');
+    expect([...view.container.querySelectorAll('.dv-byte-strip code')].map((node) => node.textContent))
+      .toEqual(['88', '77', '66', '55', '44', '33', '22', '11']);
   });
 });

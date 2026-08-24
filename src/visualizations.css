@@ -239,6 +239,83 @@
   grid-column: 1 / -1;
 }
 
+.dv-memory-bytes {
+  overflow: hidden;
+}
+
+.dv-memory-bytes .dv-section-heading > code {
+  color: var(--cyan);
+  font: 700 0.7rem var(--mono);
+}
+
+.dv-byte-address-range {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.8rem 0 0.55rem;
+}
+
+.dv-byte-address-range code {
+  color: var(--muted);
+  font: 0.68rem var(--mono);
+}
+
+.dv-byte-address-range span {
+  color: var(--amber);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.dv-byte-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--dv-byte-columns, 8), minmax(2rem, 1fr));
+  gap: 0.4rem;
+}
+
+.dv-byte-strip > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.dv-byte-strip code {
+  padding: 0.55rem 0.25rem;
+  border: 1px solid var(--line-bright);
+  border-radius: 0.38rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  font: 700 0.82rem var(--mono);
+}
+
+.dv-byte-strip small {
+  color: var(--muted);
+  font: 0.58rem var(--mono);
+}
+
+.dv-byte-strip .dv-byte-changed code {
+  border-color: var(--green);
+  color: #06150e;
+  background: var(--green);
+  box-shadow: 0 0 0.8rem color-mix(in srgb, var(--green) 24%, transparent);
+}
+
+.dv-endian-explanation {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.dv-endian-explanation code {
+  color: var(--cyan);
+  font-family: var(--mono);
+}
+
 .dv-flow-track {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
@@ -412,6 +489,30 @@
   background: color-mix(in srgb, var(--green, #57dfa0) 12%, transparent);
 }
 
+.dv-range-marker {
+  border: 1px solid currentColor;
+}
+
+.dv-reserved-marker {
+  color: var(--green, #57dfa0);
+  background: color-mix(in srgb, var(--green, #57dfa0) 10%, transparent);
+}
+
+.dv-released-marker {
+  color: var(--amber, #f2c36b);
+  background: color-mix(in srgb, var(--amber, #f2c36b) 10%, transparent);
+}
+
+.dv-stack-reserved .dv-stack-cell {
+  border-color: color-mix(in srgb, var(--green, #57dfa0) 42%, var(--line, #202a38));
+  background: color-mix(in srgb, var(--green, #57dfa0) 7%, var(--surface, #0e131c));
+}
+
+.dv-stack-released .dv-stack-cell {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--amber, #f2c36b) 42%, var(--line, #202a38));
+}
+
 .dv-current-sp {
   border-color: color-mix(in srgb, var(--cyan, #4bd5e7) 58%, transparent);
   background: var(--cyan-dim, rgba(75, 213, 231, 0.1));
@@ -426,6 +527,16 @@
 
 .dv-stack-direction {
   margin-top: 7px;
+}
+
+.dv-stack-plain-meaning {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--amber, #f2c36b);
+  color: var(--muted, #7f8da3);
+  background: color-mix(in srgb, var(--amber, #f2c36b) 6%, transparent);
+  font-size: 10px;
+  line-height: 1.55;
 }
 
 .dv-pointer-list {
@@ -716,7 +827,8 @@
 
 .dv-compact .dv-lr-change small,
 .dv-compact .dv-write-marker,
-.dv-compact .dv-old-sp-marker {
+.dv-compact .dv-old-sp-marker,
+.dv-compact .dv-range-marker {
   display: none;
 }
 
@@ -857,6 +969,7 @@
 
   .dv-write-marker,
   .dv-old-sp-marker,
+  .dv-range-marker,
   .dv-lr-change small {
     display: none;
   }

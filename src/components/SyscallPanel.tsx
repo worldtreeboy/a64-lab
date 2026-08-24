@@ -8,13 +8,14 @@ interface SyscallPanelProps {
 
 export function SyscallPanel({ syscall, describeAddress }: SyscallPanelProps) {
   return (
-    <section className="learning-section syscall-panel" aria-label="Linux ARM64 syscall">
+    <section className="learning-section syscall-panel" aria-label="Simplified Linux AArch64 syscall">
       <div className="learning-heading">
-        <div><span className="eyebrow">SIMPLIFIED MODE</span><h2>Linux ARM64 syscall</h2></div>
+        <div><span className="eyebrow">SIMPLIFIED MODE</span><h2>Linux AArch64 syscall</h2></div>
         <span className="linux-chip">AARCH64</span>
       </div>
       {syscall ? (
         <div className="syscall-content">
+          <span className="eyebrow">LAST SYSCALL</span>
           <div className="syscall-name">
             <code>x8 = {syscall.number.toString()}</code><span>→</span><strong>{syscall.name}()</strong>
           </div>
@@ -30,7 +31,12 @@ export function SyscallPanel({ syscall, describeAddress }: SyscallPanelProps) {
             );
           })}
         </div>
-      ) : <p className="learning-empty">Execute <code>svc 0</code> with x8 = 64 or 93.</p>}
+      ) : (
+        <p className="learning-empty">
+          X8 selects a Linux service: <code>64 = write</code> and <code>93 = exit</code> in this simulator.
+          X0–X2 hold its inputs. <code>SVC 0</code> sends the request.
+        </p>
+      )}
     </section>
   );
 }

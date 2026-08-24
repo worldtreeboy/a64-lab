@@ -379,7 +379,7 @@ describe('Guide and Lab integration', () => {
     expect(returnLink).toBeTruthy();
     expect(screen.getByText('Lesson program loaded. Press Step when you are ready.')).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: /Step/ }));
+    await user.click(screen.getByRole('button', { name: 'Step' }));
     expect(screen.getByText('X0 = 10')).toBeTruthy();
 
     await user.click(returnLink);
@@ -397,7 +397,7 @@ describe('Guide and Lab integration', () => {
       .toHaveLength(lesson.quiz.length);
     await user.click(screen.getAllByRole('button', { name: /Try in Lab/ })[0]);
 
-    const step = screen.getByRole('button', { name: /Step/ });
+    const step = screen.getByRole('button', { name: 'Step' });
     await user.click(step);
     let calls = screen.getByTestId('dynamic-calls');
     expect(within(calls).getByText('Call entered')).toBeTruthy();

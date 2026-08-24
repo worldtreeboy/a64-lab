@@ -4,6 +4,7 @@ interface AssemblyEditorProps {
   source: string;
   currentLine: number | null;
   errorLine: number | null;
+  sourceDirty?: boolean;
   onChange: (source: string) => void;
 }
 
@@ -14,6 +15,7 @@ export function AssemblyEditor({
   source,
   currentLine,
   errorLine,
+  sourceDirty = false,
   onChange,
 }: AssemblyEditorProps) {
   const [scrollTop, setScrollTop] = useState(0);
@@ -33,7 +35,9 @@ export function AssemblyEditor({
           <span className="eyebrow">SOURCE</span>
           <h2>Assembly Editor</h2>
         </div>
-        <span className="phase-chip">FULL LEARNING MODE</span>
+        <span className={`phase-chip ${sourceDirty ? 'source-dirty' : ''}`}>
+          {sourceDirty ? 'SOURCE CHANGED' : 'EDUCATIONAL SUBSET'}
+        </span>
       </div>
 
       <div className="editor-shell">
@@ -62,10 +66,17 @@ export function AssemblyEditor({
       </div>
 
       <div className="editor-status">
-        <span><i className="status-dot" /> AArch64</span>
+        <span><i className={`status-dot ${sourceDirty ? 'source-dirty' : ''}`} /> AArch64</span>
         <span>{lineNumbers.length} lines</span>
-        <span>Each instruction = 4 bytes</span>
+        <span title="Labels and directives do not occupy executable instruction addresses">
+          Executable instructions advance addresses by 4 bytes
+        </span>
       </div>
+      {sourceDirty && (
+        <p className="editor-dirty-note" role="status">
+          Source changed. Step, Run, or Reset reloads the program from the beginning.
+        </p>
+      )}
     </section>
   );
 }

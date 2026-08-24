@@ -23,7 +23,8 @@ function rowChanged(changed: ReadonlySet<bigint>, address: bigint): boolean {
 
 export function StackViewer({ sp, memory, changedMemory }: StackViewerProps) {
   const alignedSP = sp & ~7n;
-  const addresses = Array.from({ length: 7 }, (_, index) => alignedSP + BigInt((index - 3) * 8));
+  const spOffsetInRow = sp - alignedSP;
+  const addresses = Array.from({ length: 7 }, (_, index) => alignedSP + BigInt((3 - index) * 8));
   const changed = new Set(changedMemory);
 
   return (
@@ -32,15 +33,31 @@ export function StackViewer({ sp, memory, changedMemory }: StackViewerProps) {
         <div><span className="eyebrow">LIVE VIEW</span><h2>Stack</h2></div>
         <code>SP {formatHex(sp)}</code>
       </div>
+      <p className="stack-viewer-help">
+        <strong>The stack is ordinary memory for temporary and saved values.</strong>
+        SP holds its current boundary address. SUB SP reserves bytes at lower addresses, a store writes them,
+        and ADD SP releases them. Moving SP does not move or erase stored bytes.
+      </p>
       <div className="memory-table">
-        <div className="memory-table-header"><span>Address</span><span>64-bit value</span></div>
+        <div className="stack-address-direction"><span>Higher addresses</span><strong aria-hidden="true">↑</strong></div>
+        <div className="memory-table-header"><span>Address</span><span>8 bytes as one value</span></div>
         {addresses.map((address) => (
           <div className={`memory-row ${rowChanged(changed, address) ? 'memory-changed' : ''}`} key={address.toString()}>
             <code>{formatHex(address)}</code>
             <code>{formatHex(read64(memory, address))}</code>
-            {address === alignedSP && <span className="sp-marker">← SP</span>}
+            {address === alignedSP && (
+              <span
+                className="sp-marker"
+                title={spOffsetInRow === 0n
+                  ? `SP starts at ${formatHex(address)}`
+                  : `SP is ${spOffsetInRow.toString()} bytes after this row's start`}
+              >
+                {spOffsetInRow === 0n ? '← SP' : `← SP +${spOffsetInRow.toString()}`}
+              </span>
+            )}
           </div>
         ))}
+        <div className="stack-address-direction stack-address-lower"><strong aria-hidden="true">↓</strong><span>Lower addresses</span></div>
       </div>
     </section>
   );

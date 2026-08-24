@@ -1075,6 +1075,136 @@
   text-align: center;
 }
 
+/* Branch diagrams keep the chosen and unchosen PC paths visually separate. */
+
+.branch-always-scene,
+.branch-condition-scene {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.branch-path-origin,
+.branch-condition-rule {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  width: min(100%, 330px);
+  margin: 0 auto;
+  padding: 15px 18px;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  text-align: center;
+}
+
+.branch-path-origin > span,
+.branch-condition-rule + .branch-condition-cases span,
+.branch-condition-case > span {
+  color: var(--muted);
+  font: 750 8px/1.3 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.branch-path-origin code,
+.branch-condition-rule code {
+  color: var(--cyan);
+  font: 800 13px var(--mono);
+}
+
+.branch-path-origin strong,
+.branch-condition-rule strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.branch-path-fork,
+.branch-condition-cases {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 16px;
+}
+
+.branch-path-fork::before,
+.branch-condition-cases::before {
+  position: absolute;
+  top: 0;
+  left: 25%;
+  width: 50%;
+  height: 16px;
+  border-top: 1px solid var(--line-bright);
+  border-right: 1px solid var(--line-bright);
+  border-left: 1px solid var(--line-bright);
+  border-radius: 5px 5px 0 0;
+  content: "";
+}
+
+.branch-path-taken,
+.branch-path-skipped,
+.branch-condition-case {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+  text-align: center;
+}
+
+.branch-path-taken,
+.branch-condition-taken {
+  border-color: color-mix(in srgb, var(--green) 52%, var(--line));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--green) 9%, transparent), transparent), var(--surface-raised);
+}
+
+.branch-path-taken > span,
+.branch-condition-taken > span,
+.branch-path-taken strong,
+.branch-condition-taken strong {
+  color: var(--green);
+}
+
+.branch-path-skipped,
+.branch-condition-fallthrough {
+  opacity: 0.58;
+}
+
+.branch-path-skipped code {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--red) 70%, transparent);
+}
+
+.branch-path-taken code,
+.branch-path-skipped code,
+.branch-condition-case code {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font: 700 10px/1.5 var(--mono);
+}
+
+.branch-path-fork small,
+.branch-condition-case small,
+.branch-condition-scene > p {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.branch-condition-case strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.branch-condition-scene > p {
+  margin: 0;
+  text-align: center;
+}
+
 .pointer-scene {
   display: grid;
   grid-template-columns: minmax(145px, 0.8fr) minmax(110px, 190px) minmax(170px, 1fr);
@@ -1138,13 +1268,13 @@
 }
 
 .stack-concept-scene,
+.stack-value-scene,
 .frame-concept-scene,
 .endian-scene {
   width: min(100%, 590px);
   margin: 0 auto;
 }
 
-.stack-address-direction,
 .endian-addresses {
   display: flex;
   align-items: center;
@@ -1153,74 +1283,369 @@
   font-size: 10px;
 }
 
-.stack-address-direction strong {
+.stack-definition-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--green) 38%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--green) 6%, var(--surface));
+}
+
+.stack-definition-card > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.stack-definition-card > header > span {
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: var(--surface);
+  background: var(--green);
+  font: 850 9px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.stack-definition-card > header > strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.stack-purpose-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.stack-purpose-grid > span {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.stack-purpose-grid strong {
+  color: var(--green);
+  font-size: 9px;
+}
+
+.stack-purpose-grid small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.stack-lifo-strip {
+  display: grid;
+  grid-template-columns: minmax(70px, 0.6fr) minmax(70px, 0.6fr) minmax(150px, 1.5fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.stack-lifo-strip > span {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+
+.stack-lifo-strip > span small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.stack-lifo-strip > span strong {
+  color: var(--text);
+  font: 750 10px var(--mono);
+}
+
+.stack-lifo-strip > .stack-lifo-new {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+  box-shadow: inset 0 2px var(--amber);
+}
+
+.stack-lifo-strip > em {
+  color: var(--amber);
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.stack-only-rule,
+.stack-value-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--line));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cyan) 7%, transparent);
+  font-size: 10px;
+}
+
+.stack-only-rule strong,
+.stack-value-summary strong {
+  flex: 0 0 auto;
   color: var(--cyan);
 }
 
-.stack-concept-rows {
+.stack-only-rule span,
+.stack-value-summary span {
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.stack-spatial-direction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 2px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.stack-spatial-direction strong {
+  color: var(--cyan);
+}
+
+.stack-spatial-map {
   display: grid;
   gap: 5px;
-  margin: 8px 0;
 }
 
-.stack-concept-row {
+.stack-spatial-map > div {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr) 58px;
+  grid-template-columns: 120px minmax(0, 1fr) 88px;
   align-items: center;
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 5px;
-  background: rgba(14, 20, 30, 0.94);
+  background: var(--surface);
 }
 
-.stack-concept-row code {
+.stack-spatial-map code {
   padding-left: 10px;
   color: var(--muted);
-  font: 10px var(--mono);
+  font: 9px var(--mono);
 }
 
-.stack-concept-row > span {
-  padding: 7px 10px;
+.stack-spatial-map span {
+  padding: 8px 10px;
   border-right: 1px solid var(--line);
   border-left: 1px solid var(--line);
-  color: #9cacbf;
-  font: 10px var(--mono);
-  text-align: center;
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.4;
 }
 
-.stack-concept-row > strong {
+.stack-spatial-map strong {
   color: var(--muted);
-  font: 700 10px var(--mono);
+  font: 750 9px var(--mono);
   text-align: center;
 }
 
-.stack-concept-row.stack-new-sp {
-  border-color: rgba(75, 213, 231, 0.58);
+.stack-spatial-map > .stack-spatial-sp {
+  border-color: color-mix(in srgb, var(--cyan) 52%, var(--line));
   background: var(--cyan-dim);
   box-shadow: inset 3px 0 var(--cyan);
 }
 
-.stack-concept-row.stack-new-sp > strong {
+.stack-spatial-map > .stack-spatial-sp strong {
   color: var(--cyan);
 }
 
-.stack-move-label {
+.stack-phase-track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin: 12px 0;
+}
+
+.stack-phase-group,
+.stack-value-group {
+  position: relative;
+  min-width: 0;
+}
+
+.stack-phase-card {
+  display: grid;
+  gap: 8px;
+  height: 100%;
+  min-height: 210px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.stack-phase-card header,
+.stack-value-step header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 10px 0;
-  padding: 9px 11px;
-  border: 1px dashed rgba(75, 213, 231, 0.32);
-  border-radius: 5px;
-  color: var(--cyan);
-  background: rgba(75, 213, 231, 0.045);
+  gap: 7px;
+}
+
+.stack-phase-card header span,
+.stack-value-step header span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--cyan);
+  font: 800 10px var(--mono);
+}
+
+.stack-phase-card header strong,
+.stack-value-step header strong {
+  color: var(--text);
   font-size: 10px;
 }
 
-.stack-move-label code {
+.stack-phase-sp {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--line));
+  border-radius: 4px;
+  color: var(--cyan);
+  background: var(--cyan-dim);
+  font: 700 10px var(--mono);
+  text-align: center;
+}
+
+.stack-phase-card > small {
   color: var(--amber);
-  font: 10px var(--mono);
+  font: 9px var(--mono);
+  text-align: center;
+}
+
+.stack-phase-slots {
+  display: grid;
+  gap: 4px;
+}
+
+.stack-phase-slots code {
+  min-height: 35px;
+  padding: 7px;
+  border: 1px dashed var(--line-bright);
+  border-radius: 4px;
+  color: var(--muted);
+  font: 9px/1.35 var(--mono);
+}
+
+.stack-phase-reserved {
+  border-color: color-mix(in srgb, var(--green) 50%, var(--line));
+  box-shadow: inset 0 3px var(--green);
+}
+
+.stack-phase-reserved .stack-phase-slots code {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--green) 32%, var(--line));
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+}
+
+.stack-phase-released {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  box-shadow: inset 0 3px var(--amber);
+}
+
+.stack-phase-released .stack-phase-slots code {
+  color: var(--amber);
+}
+
+.stack-phase-card p {
+  align-self: end;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.stack-phase-arrow,
+.stack-value-arrow {
+  position: absolute;
+  top: 50%;
+  right: -21px;
+  color: var(--cyan);
+  font-weight: 800;
+  transform: translateY(-50%);
+}
+
+.stack-meaning-key {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--amber);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--amber) 6%, transparent);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.stack-meaning-key strong {
+  color: var(--text);
+}
+
+.stack-value-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+  margin-bottom: 12px;
+}
+
+.stack-value-step {
+  display: grid;
+  gap: 8px;
+  height: 100%;
+  min-height: 125px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.stack-value-step > code {
+  color: var(--cyan);
+  font: 9px/1.4 var(--mono);
+}
+
+.stack-value-step > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.stack-value-str {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  box-shadow: inset 0 3px var(--green);
+}
+
+.stack-value-ldr {
+  border-color: color-mix(in srgb, var(--cyan) 45%, var(--line));
+  box-shadow: inset 0 3px var(--cyan);
+}
+
+.stack-value-add {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+  box-shadow: inset 0 3px var(--amber);
+}
+
+.stack-value-summary {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--line));
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+}
+
+.stack-value-summary strong {
+  color: var(--green);
 }
 
 .frame-registers {
@@ -2541,6 +2966,55 @@
     grid-template-columns: repeat(4, minmax(38px, 1fr));
   }
 
+  .stack-phase-track,
+  .stack-value-track {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .stack-purpose-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stack-lifo-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stack-lifo-strip > em {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .stack-spatial-map > div {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .stack-spatial-map strong {
+    grid-column: 1 / -1;
+    padding: 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .stack-phase-card,
+  .stack-value-step {
+    min-height: 0;
+  }
+
+  .stack-phase-arrow,
+  .stack-value-arrow {
+    top: auto;
+    right: 50%;
+    bottom: -20px;
+    transform: translateX(50%) rotate(90deg);
+  }
+
+  .stack-only-rule,
+  .stack-value-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
   .live-lesson-demo {
     margin-top: 44px;
     padding: 16px;
@@ -2607,27 +3081,6 @@
 
   .lesson-header {
     flex-direction: column-reverse;
-  }
-
-  .stack-concept-row {
-    grid-template-columns: 78px minmax(0, 1fr) 43px;
-  }
-
-  .stack-concept-row code {
-    padding-left: 7px;
-    font-size: 10px;
-  }
-
-  .stack-concept-row > span {
-    padding-right: 5px;
-    padding-left: 5px;
-    font-size: 10px;
-  }
-
-  .stack-move-label {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
   }
 
   .frame-stack > div {
@@ -2727,4 +3180,616 @@
 :root[data-theme="cyberpunk"] .prediction-card,
 :root[data-theme="cyberpunk"] .challenge-card {
   background-color: var(--surface);
+}
+
+/* Cyberpunk guide HUD ----------------------------------------------------- */
+
+:root[data-theme="cyberpunk"] .guide-layout {
+  background:
+    radial-gradient(circle at 52% -12%, rgba(69, 231, 255, 0.08), transparent 34%),
+    radial-gradient(circle at 88% 14%, rgba(155, 124, 255, 0.055), transparent 28%),
+    rgba(3, 6, 12, 0.62);
+}
+
+:root[data-theme="cyberpunk"] .guide-sidebar,
+:root[data-theme="cyberpunk"] .guide-reference {
+  border-color: rgba(69, 231, 255, 0.13);
+  background:
+    linear-gradient(rgba(69, 231, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(69, 231, 255, 0.018) 1px, transparent 1px),
+    rgba(4, 8, 16, 0.84);
+  background-size: 32px 32px, 32px 32px, auto;
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+:root[data-theme="cyberpunk"] .guide-main,
+:root[data-theme="cyberpunk"] .challenges-page {
+  background:
+    radial-gradient(circle at 34% 0%, rgba(69, 231, 255, 0.035), transparent 25%),
+    radial-gradient(circle at 82% 26%, rgba(155, 124, 255, 0.03), transparent 24%);
+  scrollbar-color: rgba(69, 231, 255, 0.34) transparent;
+}
+
+:root[data-theme="cyberpunk"] .curriculum-heading,
+:root[data-theme="cyberpunk"] .guide-reference .learning-heading {
+  background: linear-gradient(105deg, rgba(69, 231, 255, 0.055), transparent 60%, rgba(155, 124, 255, 0.035));
+}
+
+:root[data-theme="cyberpunk"] .lesson-stage + .lesson-stage,
+:root[data-theme="cyberpunk"] .guide-sidebar .learning-progress,
+:root[data-theme="cyberpunk"] .lesson-header,
+:root[data-theme="cyberpunk"] .lesson-quiz {
+  border-color: rgba(69, 231, 255, 0.13);
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a:hover {
+  color: var(--text);
+  background: linear-gradient(90deg, rgba(69, 231, 255, 0.06), rgba(155, 124, 255, 0.035));
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a.active {
+  border-color: rgba(69, 231, 255, 0.34);
+  color: #c9faff;
+  background: linear-gradient(100deg, rgba(69, 231, 255, 0.13), rgba(155, 124, 255, 0.075) 62%, transparent);
+  box-shadow: inset 2px 0 var(--cyan), 0 0 18px rgba(69, 231, 255, 0.055);
+}
+
+:root[data-theme="cyberpunk"] .lesson-status {
+  border-color: rgba(83, 111, 157, 0.7);
+  color: #8093b4;
+  background: rgba(8, 14, 25, 0.7);
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a.active .lesson-status {
+  position: relative;
+  border-color: var(--cyan);
+  color: #d5fbff;
+  background: rgba(69, 231, 255, 0.12);
+  box-shadow: 0 0 12px rgba(69, 231, 255, 0.22);
+  animation: none;
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a.active .lesson-status::after {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid rgba(69, 231, 255, 0.68);
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  transform: scale(0.72);
+  will-change: transform, opacity;
+  animation: cyber-guide-status-ring 3s ease-out infinite;
+}
+
+:root[data-theme="cyberpunk"] .lesson-status.complete {
+  border-color: rgba(85, 246, 183, 0.48);
+  color: #9effd3;
+  background: rgba(85, 246, 183, 0.085);
+  box-shadow: 0 0 10px rgba(85, 246, 183, 0.08);
+}
+
+:root[data-theme="cyberpunk"] .guide-hero h2,
+:root[data-theme="cyberpunk"] .lesson-header h2,
+:root[data-theme="cyberpunk"] .dashboard-heading h3 {
+  color: #f1f8ff;
+  text-shadow: 0 0 24px rgba(69, 231, 255, 0.1);
+}
+
+:root[data-theme="cyberpunk"] .lesson-duration {
+  border-color: rgba(155, 124, 255, 0.38);
+  color: #c7baff;
+  background: rgba(155, 124, 255, 0.065);
+}
+
+:root[data-theme="cyberpunk"] .learning-path,
+:root[data-theme="cyberpunk"] .dashboard-progress,
+:root[data-theme="cyberpunk"] .module-card,
+:root[data-theme="cyberpunk"] .prediction-card,
+:root[data-theme="cyberpunk"] .challenge-card,
+:root[data-theme="cyberpunk"] .assembly-example,
+:root[data-theme="cyberpunk"] .concept-diagram,
+:root[data-theme="cyberpunk"] .lesson-navigation a {
+  border-color: rgba(47, 68, 103, 0.78);
+  background:
+    linear-gradient(145deg, rgba(69, 231, 255, 0.025), transparent 43%, rgba(155, 124, 255, 0.028)),
+    rgba(6, 11, 21, 0.9);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.018), 0 14px 34px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-theme="cyberpunk"] .module-card:hover,
+:root[data-theme="cyberpunk"] .lesson-navigation a:hover {
+  border-color: rgba(69, 231, 255, 0.42);
+  background-color: rgba(12, 22, 39, 0.96);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2), 0 0 20px rgba(69, 231, 255, 0.05);
+}
+
+:root[data-theme="cyberpunk"] .module-card > span {
+  border-color: rgba(69, 231, 255, 0.38);
+  color: #bdf8ff;
+  background: linear-gradient(145deg, rgba(69, 231, 255, 0.12), rgba(155, 124, 255, 0.08));
+}
+
+:root[data-theme="cyberpunk"] .continue-card {
+  border-color: rgba(155, 124, 255, 0.2);
+  background: linear-gradient(135deg, rgba(69, 231, 255, 0.075), rgba(155, 124, 255, 0.06), transparent 78%);
+}
+
+:root[data-theme="cyberpunk"] .progress-track {
+  border-color: rgba(69, 231, 255, 0.2);
+  background: rgba(2, 6, 12, 0.9);
+  box-shadow: inset 0 0 9px rgba(0, 0, 0, 0.65);
+}
+
+:root[data-theme="cyberpunk"] .progress-track > span {
+  background: linear-gradient(90deg, var(--cyan), var(--violet) 62%, var(--green));
+  box-shadow: 0 0 13px rgba(69, 231, 255, 0.28);
+}
+
+:root[data-theme="cyberpunk"] .lesson-mental-model {
+  border-color: rgba(69, 231, 255, 0.32);
+  border-left-color: var(--cyan);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(69, 231, 255, 0.1), transparent 36%),
+    linear-gradient(115deg, rgba(69, 231, 255, 0.055), rgba(155, 124, 255, 0.045) 68%, transparent),
+    rgba(7, 13, 24, 0.92);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.02), 0 0 28px rgba(69, 231, 255, 0.045);
+}
+
+:root[data-theme="cyberpunk"] .lesson-mental-model-integration {
+  border-color: rgba(85, 246, 183, 0.3);
+  border-left-color: var(--green);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(85, 246, 183, 0.085), transparent 36%),
+    linear-gradient(115deg, rgba(85, 246, 183, 0.045), rgba(155, 124, 255, 0.045) 70%, transparent),
+    rgba(7, 13, 24, 0.92);
+}
+
+:root[data-theme="cyberpunk"] .lesson-concept-context p {
+  border-color: rgba(61, 84, 124, 0.68);
+  background: rgba(3, 8, 16, 0.58);
+}
+
+:root[data-theme="cyberpunk"] .lesson-section p,
+:root[data-theme="cyberpunk"] .lesson-section li,
+:root[data-theme="cyberpunk"] .lesson-finish p {
+  color: #a8b7cc;
+}
+
+:root[data-theme="cyberpunk"] .lesson-section :not(pre) > code,
+:root[data-theme="cyberpunk"] .lesson-callout code,
+:root[data-theme="cyberpunk"] .challenge-card p code {
+  border-color: rgba(69, 231, 255, 0.2);
+  color: #9bf4ff;
+  background: rgba(6, 14, 25, 0.88);
+  box-shadow: inset 0 0 10px rgba(69, 231, 255, 0.025);
+}
+
+:root[data-theme="cyberpunk"] .lesson-callout {
+  border-color: rgba(255, 211, 106, 0.34);
+  border-left-color: var(--amber);
+  color: #bbc5d3;
+  background: linear-gradient(110deg, rgba(255, 211, 106, 0.075), rgba(255, 83, 199, 0.025), transparent 74%);
+}
+
+:root[data-theme="cyberpunk"] .state-walkthrough {
+  border-color: rgba(48, 70, 107, 0.78);
+  background:
+    linear-gradient(90deg, rgba(69, 231, 255, 0.025), transparent 46%, rgba(155, 124, 255, 0.025)),
+    rgba(3, 8, 16, 0.72);
+}
+
+:root[data-theme="cyberpunk"] .state-walkthrough-phase {
+  border-color: rgba(58, 81, 122, 0.74);
+  background: rgba(9, 17, 31, 0.9);
+}
+
+:root[data-theme="cyberpunk"] .state-walkthrough-execute {
+  border-color: rgba(155, 124, 255, 0.5);
+  background: linear-gradient(145deg, rgba(69, 231, 255, 0.07), rgba(155, 124, 255, 0.13));
+  box-shadow: 0 0 18px rgba(155, 124, 255, 0.06);
+}
+
+:root[data-theme="cyberpunk"] .state-walkthrough-after {
+  border-color: rgba(85, 246, 183, 0.44);
+  background: linear-gradient(145deg, rgba(85, 246, 183, 0.065), transparent), rgba(9, 17, 31, 0.9);
+}
+
+:root[data-theme="cyberpunk"] .lesson-transition,
+:root[data-theme="cyberpunk"] .lesson-finish {
+  border-color: rgba(69, 231, 255, 0.3);
+  border-left-color: var(--cyan);
+  background:
+    linear-gradient(105deg, rgba(69, 231, 255, 0.095), rgba(155, 124, 255, 0.055) 62%, transparent),
+    rgba(7, 13, 24, 0.92);
+  box-shadow: 0 0 24px rgba(69, 231, 255, 0.035);
+}
+
+:root[data-theme="cyberpunk"] .assembly-example-heading {
+  border-color: rgba(69, 231, 255, 0.13);
+  background: linear-gradient(90deg, rgba(69, 231, 255, 0.045), rgba(155, 124, 255, 0.025));
+}
+
+:root[data-theme="cyberpunk"] .assembly-code,
+:root[data-theme="cyberpunk"] .challenge-editor textarea {
+  color: #c7d7ea;
+  background:
+    linear-gradient(90deg, rgba(69, 231, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(rgba(69, 231, 255, 0.012) 1px, transparent 1px),
+    rgba(3, 8, 15, 0.94);
+  background-size: 24px 100%, 100% 23px, auto;
+}
+
+:root[data-theme="cyberpunk"] .asm-opcode { color: #74efff; text-shadow: 0 0 8px rgba(69, 231, 255, 0.12); }
+:root[data-theme="cyberpunk"] .asm-register { color: #b7a4ff; }
+:root[data-theme="cyberpunk"] .asm-label { color: #8dffca; }
+:root[data-theme="cyberpunk"] .asm-directive,
+:root[data-theme="cyberpunk"] .asm-immediate { color: #ffdc82; }
+
+:root[data-theme="cyberpunk"] .prediction-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(155, 124, 255, 0.055), transparent 32%),
+    rgba(7, 13, 24, 0.94);
+}
+
+:root[data-theme="cyberpunk"] .quiz-option {
+  border-color: rgba(46, 67, 101, 0.76);
+  color: #b2c0d4;
+  background: rgba(4, 9, 17, 0.72);
+}
+
+:root[data-theme="cyberpunk"] .quiz-option:hover {
+  border-color: rgba(69, 231, 255, 0.38);
+  background: linear-gradient(100deg, rgba(69, 231, 255, 0.065), rgba(155, 124, 255, 0.035));
+}
+
+:root[data-theme="cyberpunk"] .quiz-option:has(input:checked) {
+  border-color: rgba(155, 124, 255, 0.62);
+  color: #d6ccff;
+  background: linear-gradient(100deg, rgba(69, 231, 255, 0.08), rgba(155, 124, 255, 0.15));
+  box-shadow: inset 2px 0 var(--violet), 0 0 18px rgba(155, 124, 255, 0.06);
+}
+
+:root[data-theme="cyberpunk"] .quiz-option.answer-correct,
+:root[data-theme="cyberpunk"] .quiz-feedback.correct {
+  border-color: rgba(85, 246, 183, 0.5);
+  background: rgba(85, 246, 183, 0.075);
+}
+
+:root[data-theme="cyberpunk"] .quiz-option.answer-incorrect,
+:root[data-theme="cyberpunk"] .quiz-feedback.incorrect {
+  border-color: rgba(255, 102, 135, 0.5);
+  background: rgba(255, 102, 135, 0.075);
+}
+
+:root[data-theme="cyberpunk"] .lesson-navigation a {
+  color: #aaf5ff;
+}
+
+:root[data-theme="cyberpunk"] .live-lesson-demo {
+  border-color: rgba(69, 231, 255, 0.22);
+  background: rgba(5, 10, 19, 0.78);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* The compact branch diagrams use the same HUD language without sacrificing
+ * their taken-versus-fallthrough distinction. */
+:root[data-theme="cyberpunk"] .branch-path-origin,
+:root[data-theme="cyberpunk"] .branch-condition-rule {
+  border-color: rgba(155, 124, 255, 0.48);
+  background: linear-gradient(145deg, rgba(69, 231, 255, 0.07), rgba(155, 124, 255, 0.11)), rgba(7, 13, 24, 0.94);
+  box-shadow: 0 0 22px rgba(155, 124, 255, 0.06);
+}
+
+:root[data-theme="cyberpunk"] .branch-path-fork::before,
+:root[data-theme="cyberpunk"] .branch-condition-cases::before {
+  border-color: rgba(69, 231, 255, 0.38);
+}
+
+:root[data-theme="cyberpunk"] .branch-path-taken,
+:root[data-theme="cyberpunk"] .branch-condition-taken {
+  border-color: rgba(85, 246, 183, 0.54);
+  background: linear-gradient(145deg, rgba(85, 246, 183, 0.1), rgba(69, 231, 255, 0.035)), rgba(7, 14, 24, 0.94);
+  box-shadow: 0 0 20px rgba(85, 246, 183, 0.055);
+}
+
+:root[data-theme="cyberpunk"] .branch-path-skipped,
+:root[data-theme="cyberpunk"] .branch-condition-fallthrough {
+  border-color: rgba(94, 107, 137, 0.44);
+  background: rgba(7, 11, 20, 0.74);
+}
+
+@media (max-width: 560px) {
+  .branch-path-fork,
+  .branch-condition-cases {
+    grid-template-columns: 1fr;
+    padding-top: 0;
+  }
+
+  .branch-path-fork::before,
+  .branch-condition-cases::before {
+    display: none;
+  }
+
+  .branch-path-taken,
+  .branch-path-skipped,
+  .branch-condition-case {
+    min-height: 0;
+  }
+
+  :root[data-theme="cyberpunk"] .guide-sidebar,
+  :root[data-theme="cyberpunk"] .guide-reference {
+    background-size: 26px 26px, 26px 26px, auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="cyberpunk"] .lesson-list a.active .lesson-status {
+    animation: none !important;
+  }
+}
+
+/* Cyberpunk guide motion --------------------------------------------------
+ * Reading content receives one short boot sequence; the continuous motion
+ * stays on borders, progress indicators, and route signals.
+ */
+
+:root[data-theme="cyberpunk"] .guide-dashboard > *,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-header,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-mental-model,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-section,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-quiz,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-navigation {
+  animation: cyber-guide-arrive 580ms cubic-bezier(0.16, 0.78, 0.2, 1) both;
+}
+
+:root[data-theme="cyberpunk"] .guide-dashboard > :nth-child(2),
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-mental-model {
+  animation-delay: 70ms;
+}
+
+:root[data-theme="cyberpunk"] .guide-dashboard > :nth-child(3),
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-section:nth-of-type(1) {
+  animation-delay: 120ms;
+}
+
+:root[data-theme="cyberpunk"] .guide-dashboard > :nth-child(4),
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-section:nth-of-type(2) {
+  animation-delay: 170ms;
+}
+
+:root[data-theme="cyberpunk"] .guide-dashboard > :nth-child(n + 5),
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-section:nth-of-type(n + 3),
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-quiz,
+:root[data-theme="cyberpunk"] .lesson-view > .lesson-navigation {
+  animation-delay: 220ms;
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a.active,
+:root[data-theme="cyberpunk"] .module-card,
+:root[data-theme="cyberpunk"] .continue-card,
+:root[data-theme="cyberpunk"] .lesson-mental-model,
+:root[data-theme="cyberpunk"] .state-walkthrough-execute,
+:root[data-theme="cyberpunk"] .concept-diagram {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-theme="cyberpunk"] .lesson-list a.active::after,
+:root[data-theme="cyberpunk"] .module-card::after,
+:root[data-theme="cyberpunk"] .continue-card::after,
+:root[data-theme="cyberpunk"] .lesson-mental-model::after,
+:root[data-theme="cyberpunk"] .concept-diagram::after {
+  position: absolute;
+  z-index: 3;
+  top: -1px;
+  left: 0;
+  width: 32%;
+  height: 2px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(69, 231, 255, 0.38), var(--cyan), rgba(155, 124, 255, 0.62), transparent);
+  box-shadow: 0 0 8px rgba(69, 231, 255, 0.38);
+  content: "";
+  opacity: 0;
+  transform: translate3d(-130%, 0, 0);
+  will-change: transform, opacity;
+  animation: cyber-guide-edge 7.8s 1.1s ease-in-out infinite;
+}
+
+:root[data-theme="cyberpunk"] .module-card:nth-child(even)::after,
+:root[data-theme="cyberpunk"] .lesson-mental-model::after {
+  animation-delay: 2.9s;
+}
+
+:root[data-theme="cyberpunk"] .state-walkthrough-execute::after {
+  position: absolute;
+  inset: -45% 0 auto;
+  height: 34%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(69, 231, 255, 0.12), rgba(155, 124, 255, 0.045), transparent);
+  content: "";
+  opacity: 0;
+  transform: translate3d(0, -140%, 0);
+  will-change: transform, opacity;
+  animation: cyber-guide-execute-scan 5.2s 1.4s ease-in-out infinite;
+}
+
+:root[data-theme="cyberpunk"] .progress-track > span {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-theme="cyberpunk"] .progress-track > span::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 24%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  content: "";
+  opacity: 0;
+  transform: translate3d(-160%, 0, 0) skewX(-18deg);
+  will-change: transform, opacity;
+  animation: cyber-progress-charge 3.8s 900ms ease-in-out infinite;
+}
+
+:root[data-theme="cyberpunk"] .branch-path-taken,
+:root[data-theme="cyberpunk"] .branch-condition-taken {
+  position: relative;
+  overflow: hidden;
+  animation: none;
+}
+
+:root[data-theme="cyberpunk"] .branch-path-taken::after,
+:root[data-theme="cyberpunk"] .branch-condition-taken::after {
+  position: absolute;
+  inset: -35% auto -35% 0;
+  width: 24%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(205, 255, 237, 0.27), rgba(69, 231, 255, 0.1), transparent);
+  content: "";
+  opacity: 0;
+  transform: translate3d(-150%, 0, 0) skewX(-14deg);
+  will-change: transform, opacity;
+  animation: cyber-route-scan 5.2s 1.1s ease-in-out infinite;
+}
+
+:root[data-theme="cyberpunk"] .branch-path-skipped,
+:root[data-theme="cyberpunk"] .branch-condition-fallthrough {
+  opacity: 0.66;
+}
+
+/* Smoked-glass guide surfaces keep the reading layer distinct from the
+ * drifting HUD behind it. */
+:root[data-theme="cyberpunk"] .guide-sidebar,
+:root[data-theme="cyberpunk"] .guide-reference {
+  background-color: rgba(4, 9, 18, 0.7);
+  box-shadow: inset 0 0 34px rgba(69, 231, 255, 0.018), 0 18px 42px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(15px) saturate(128%);
+}
+
+:root[data-theme="cyberpunk"] :is(
+  .learning-path,
+  .dashboard-progress,
+  .lesson-mental-model,
+  .concept-diagram,
+  .live-lesson-demo
+) {
+  border-color: rgba(88, 167, 207, 0.29);
+  background-color: rgba(5, 11, 21, 0.72);
+  box-shadow:
+    inset 0 1px rgba(193, 249, 255, 0.065),
+    inset 0 0 32px rgba(69, 231, 255, 0.015),
+    0 18px 44px rgba(0, 0, 0, 0.26),
+    0 0 24px rgba(69, 231, 255, 0.03);
+  backdrop-filter: blur(13px) saturate(126%);
+}
+
+:root[data-theme="cyberpunk"] :is(
+  .module-card,
+  .prediction-card,
+  .challenge-card,
+  .assembly-example,
+  .lesson-navigation a
+) {
+  background-color: rgba(6, 12, 23, 0.78);
+  box-shadow: inset 0 1px rgba(196, 249, 255, 0.04), 0 14px 34px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="cyberpunk"] .lesson-mental-model,
+:root[data-theme="cyberpunk"] .concept-diagram,
+:root[data-theme="cyberpunk"] .live-lesson-demo {
+  background-image:
+    linear-gradient(var(--cyan), var(--cyan)) 8px 8px / 16px 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) 8px 8px / 1px 16px no-repeat,
+    linear-gradient(var(--violet), var(--violet)) calc(100% - 8px) 8px / 16px 1px no-repeat,
+    linear-gradient(var(--violet), var(--violet)) calc(100% - 8px) 8px / 1px 16px no-repeat,
+    radial-gradient(circle at 8% 8%, rgba(69, 231, 255, 0.085), transparent 34%),
+    linear-gradient(120deg, rgba(69, 231, 255, 0.04), transparent 52%, rgba(155, 124, 255, 0.035));
+}
+
+:root[data-theme="cyberpunk"] .module-card::after {
+  animation: none;
+}
+
+:root[data-theme="cyberpunk"] .module-card:hover::after,
+:root[data-theme="cyberpunk"] .module-card:focus-visible::after {
+  animation: cyber-guide-edge 950ms ease-out both;
+}
+
+@keyframes cyber-guide-arrive {
+  from { opacity: 0; transform: translate3d(0, 9px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes cyber-guide-edge {
+  0%, 18% { opacity: 0; transform: translate3d(-130%, 0, 0); }
+  29% { opacity: 0.78; }
+  58% { opacity: 0.52; }
+  74%, 100% { opacity: 0; transform: translate3d(420%, 0, 0); }
+}
+
+@keyframes cyber-guide-execute-scan {
+  0%, 14% { opacity: 0; transform: translate3d(0, -140%, 0); }
+  28% { opacity: 0.72; }
+  70% { opacity: 0.38; }
+  88%, 100% { opacity: 0; transform: translate3d(0, 440%, 0); }
+}
+
+@keyframes cyber-progress-charge {
+  0%, 15% { opacity: 0; transform: translate3d(-160%, 0, 0) skewX(-18deg); }
+  32% { opacity: 0.8; }
+  72%, 100% { opacity: 0; transform: translate3d(520%, 0, 0) skewX(-18deg); }
+}
+
+@keyframes cyber-guide-status-ring {
+  0% { opacity: 0; transform: scale(0.72); }
+  20% { opacity: 0.65; }
+  72%, 100% { opacity: 0; transform: scale(1.55); }
+}
+
+@keyframes cyber-route-scan {
+  0%, 42% { opacity: 0; transform: translate3d(-150%, 0, 0) skewX(-14deg); }
+  54% { opacity: 0.68; }
+  80%, 100% { opacity: 0; transform: translate3d(520%, 0, 0) skewX(-14deg); }
+}
+
+@media (max-width: 560px) {
+  :root[data-theme="cyberpunk"] .module-card::after,
+  :root[data-theme="cyberpunk"] .concept-diagram::after {
+    animation-duration: 10s;
+  }
+
+  :root[data-theme="cyberpunk"] .guide-sidebar,
+  :root[data-theme="cyberpunk"] .guide-reference,
+  :root[data-theme="cyberpunk"] :is(
+    .learning-path,
+    .dashboard-progress,
+    .lesson-mental-model,
+    .concept-diagram,
+    .live-lesson-demo
+  ) {
+    background-color: rgba(5, 10, 19, 0.88);
+    backdrop-filter: blur(8px) saturate(115%);
+  }
+
+  :root[data-theme="cyberpunk"] .progress-track > span::after {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="cyberpunk"] .guide-dashboard > *,
+  :root[data-theme="cyberpunk"] .lesson-view > *,
+  :root[data-theme="cyberpunk"] .lesson-list a.active::after,
+  :root[data-theme="cyberpunk"] .module-card::after,
+  :root[data-theme="cyberpunk"] .continue-card::after,
+  :root[data-theme="cyberpunk"] .lesson-mental-model::after,
+  :root[data-theme="cyberpunk"] .state-walkthrough-execute::after,
+  :root[data-theme="cyberpunk"] .concept-diagram::after,
+  :root[data-theme="cyberpunk"] .progress-track > span::after,
+  :root[data-theme="cyberpunk"] .lesson-list a.active .lesson-status::after,
+  :root[data-theme="cyberpunk"] .branch-path-taken::after,
+  :root[data-theme="cyberpunk"] .branch-condition-taken::after {
+    animation: none !important;
+    transform: none !important;
+  }
 }

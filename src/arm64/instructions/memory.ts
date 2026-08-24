@@ -23,6 +23,33 @@ function addressLabel(memoryOperand: MemoryOperand): string {
   return `${base} ${memoryOperand.offset < 0n ? '-' : '+'} ${memoryOperand.offset < 0n ? -memoryOperand.offset : memoryOperand.offset}`;
 }
 
+function updatedBaseLabel(memoryOperand: MemoryOperand): string {
+  const base = memoryOperand.base.toUpperCase();
+  if (memoryOperand.offset === 0n) return `old ${base}`;
+  const operator = memoryOperand.offset < 0n ? '-' : '+';
+  const magnitude = memoryOperand.offset < 0n ? -memoryOperand.offset : memoryOperand.offset;
+  return `old ${base} ${operator} ${magnitude}`;
+}
+
+function accessBaseLabel(memoryOperand: MemoryOperand): string {
+  const base = memoryOperand.base.toUpperCase();
+  if (memoryOperand.writeback === 'pre') return `new ${base}`;
+  if (memoryOperand.writeback === 'post') return `old ${base}`;
+  return addressLabel(memoryOperand);
+}
+
+function explainWriteback(memoryOperand: MemoryOperand, access: string): string {
+  const base = memoryOperand.base.toUpperCase();
+  const sentenceAccess = `${access[0]?.toUpperCase() ?? ''}${access.slice(1)}`;
+  if (memoryOperand.writeback === 'pre') {
+    return `First set ${base} = ${updatedBaseLabel(memoryOperand)}; then ${access}.`;
+  }
+  if (memoryOperand.writeback === 'post') {
+    return `${sentenceAccess}; then set ${base} = ${updatedBaseLabel(memoryOperand)}.`;
+  }
+  return `${sentenceAccess}.`;
+}
+
 function resolveAddress(
   operand: MemoryOperand,
   registers: RegisterState,
@@ -79,23 +106,35 @@ export function executeMemory(
     case 'ldr': {
       writeRegister(registers, first.name, memory.read(resolved.address, registerWidth(first.name)));
       if (firstBefore !== registers[firstCanonical]) changedRegisters.push(firstCanonical);
-      explanation = `Read ${registerWidth(first.name)} bytes from ${addressLabel(memoryOperand)} into ${first.name.toUpperCase()}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `read ${registerWidth(first.name)} bytes from ${accessBaseLabel(memoryOperand)} into ${first.name.toUpperCase()}`,
+      );
       break;
     }
     case 'ldrb': {
       writeRegister(registers, first.name, BigInt(memory.readByte(resolved.address)));
       if (firstBefore !== registers[firstCanonical]) changedRegisters.push(firstCanonical);
-      explanation = `Read 1 byte from ${addressLabel(memoryOperand)} into ${first.name.toUpperCase()}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `read 1 byte from ${accessBaseLabel(memoryOperand)} into ${first.name.toUpperCase()}`,
+      );
       break;
     }
     case 'str': {
       changedMemory.push(...memory.write(resolved.address, readRegister(registers, first.name), registerWidth(first.name)));
-      explanation = `Store ${first.name.toUpperCase()} at memory address ${addressLabel(memoryOperand)}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `store ${first.name.toUpperCase()} at memory address ${accessBaseLabel(memoryOperand)}`,
+      );
       break;
     }
     case 'strb': {
       changedMemory.push(...memory.write(resolved.address, readRegister(registers, first.name), 1));
-      explanation = `Store the low byte of ${first.name.toUpperCase()} at ${addressLabel(memoryOperand)}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `store the low byte of ${first.name.toUpperCase()} at ${accessBaseLabel(memoryOperand)}`,
+      );
       break;
     }
     case 'ldp': {
@@ -106,14 +145,20 @@ export function executeMemory(
       writeRegister(registers, second!.name, memory.read(resolved.address + BigInt(width), width));
       if (firstBefore !== registers[firstCanonical]) changedRegisters.push(firstCanonical);
       if (secondBefore !== registers[secondCanonical]) changedRegisters.push(secondCanonical);
-      explanation = `Load ${first.name.toUpperCase()} and ${second!.name.toUpperCase()} from ${addressLabel(memoryOperand)}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `load ${first.name.toUpperCase()} from ${accessBaseLabel(memoryOperand)} and ${second!.name.toUpperCase()} from ${accessBaseLabel(memoryOperand)} + ${width}`,
+      );
       break;
     }
     case 'stp': {
       const width = registerWidth(first.name);
       changedMemory.push(...memory.write(resolved.address, readRegister(registers, first.name), width));
       changedMemory.push(...memory.write(resolved.address + BigInt(width), readRegister(registers, second!.name), width));
-      explanation = `Store ${first.name.toUpperCase()} and ${second!.name.toUpperCase()} at ${addressLabel(memoryOperand)}.`;
+      explanation = explainWriteback(
+        memoryOperand,
+        `store ${first.name.toUpperCase()} at ${accessBaseLabel(memoryOperand)} and ${second!.name.toUpperCase()} at ${accessBaseLabel(memoryOperand)} + ${width}`,
+      );
       break;
     }
   }

@@ -57,6 +57,19 @@ export function executeArithmetic(
 
   writeRegister(registers, destination.name, value);
 
+  const adjustsSP = destination.name === 'sp'
+    && sourceA?.kind === 'register'
+    && sourceA.name === 'sp'
+    && sourceB?.kind === 'immediate'
+    && sourceB.value > 0n;
+  if (adjustsSP && instruction.opcode === 'sub') {
+    explanation = `SP moves ${sourceB.value} bytes lower to reserve stack space. Memory bytes are unchanged.`;
+  } else if (adjustsSP && instruction.opcode === 'add') {
+    explanation = `SP moves ${sourceB.value} bytes higher to release stack space. Old memory bytes are not erased.`;
+  } else if (destination.name.startsWith('w')) {
+    explanation += ` Writing ${destination.name.toUpperCase()} also clears ${canonicalDestination.toUpperCase()}'s upper 32 bits to zero.`;
+  }
+
   return {
     changedRegisters: before === registers[canonicalDestination] ? [] : [canonicalDestination],
     explanation,

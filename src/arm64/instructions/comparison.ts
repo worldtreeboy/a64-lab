@@ -32,7 +32,7 @@ export function executeComparison(
     const result = left & right;
     return {
       changedFlags: setFlags(flags, { N: (result & sign) !== 0n, Z: result === 0n, C: false, V: false }),
-      explanation: `Test ${leftOperand.name.toUpperCase()} & ${rightOperand.kind === 'register' ? rightOperand.name.toUpperCase() : rightOperand.value}.`,
+      explanation: `TST computes ${leftOperand.name.toUpperCase()} & ${rightOperand.kind === 'register' ? rightOperand.name.toUpperCase() : rightOperand.value} without storing the result. ${result === 0n ? 'The result is zero, so Z = 1.' : 'The result is not zero, so Z = 0.'} NZCV is updated; the operands are unchanged.`,
     };
   }
 
@@ -45,6 +45,6 @@ export function executeComparison(
       C: left >= right,
       V: overflow,
     }),
-    explanation: `Compare ${leftOperand.name.toUpperCase()} with ${rightOperand.kind === 'register' ? rightOperand.name.toUpperCase() : rightOperand.value}.`,
+    explanation: `CMP computes ${leftOperand.name.toUpperCase()} - ${rightOperand.kind === 'register' ? rightOperand.name.toUpperCase() : rightOperand.value} without storing the result. ${result === 0n ? 'The result is zero, so Z = 1.' : 'The result is not zero, so Z = 0.'} NZCV is updated; the operands are unchanged.`,
   };
 }

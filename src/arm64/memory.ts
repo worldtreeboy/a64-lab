@@ -1,4 +1,10 @@
+import { MASK_64 } from './registers';
+
 export type MemorySnapshot = Map<bigint, number>;
+
+function normalizeAddress(address: bigint): bigint {
+  return address & MASK_64;
+}
 
 /** Sparse, byte-addressable, little-endian memory used by the teaching CPU. */
 export class ARM64Memory {
@@ -9,11 +15,11 @@ export class ARM64Memory {
   }
 
   readByte(address: bigint): number {
-    return this.bytes.get(address) ?? 0;
+    return this.bytes.get(normalizeAddress(address)) ?? 0;
   }
 
   writeByte(address: bigint, value: number | bigint): void {
-    this.bytes.set(address, Number(BigInt(value) & 0xffn));
+    this.bytes.set(normalizeAddress(address), Number(BigInt(value) & 0xffn));
   }
 
   read(address: bigint, size: number): bigint {
@@ -27,7 +33,7 @@ export class ARM64Memory {
   write(address: bigint, value: bigint, size: number): bigint[] {
     const changed: bigint[] = [];
     for (let offset = 0; offset < size; offset += 1) {
-      const byteAddress = address + BigInt(offset);
+      const byteAddress = normalizeAddress(address + BigInt(offset));
       const nextByte = Number((value >> BigInt(offset * 8)) & 0xffn);
       if (this.readByte(byteAddress) !== nextByte || !this.bytes.has(byteAddress)) {
         changed.push(byteAddress);
@@ -46,7 +52,7 @@ export class ARM64Memory {
   }
 
   hasStoredByte(address: bigint): boolean {
-    return this.bytes.has(address);
+    return this.bytes.has(normalizeAddress(address));
   }
 
   snapshot(): MemorySnapshot {
@@ -54,6 +60,8 @@ export class ARM64Memory {
   }
 
   restore(snapshot: MemorySnapshot): void {
-    this.bytes = new Map(snapshot);
+    this.bytes = new Map(
+      [...snapshot].map(([address, value]) => [normalizeAddress(address), value]),
+    );
   }
 }

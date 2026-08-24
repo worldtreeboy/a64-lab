@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { CPUFlags, CPUSnapshot, FlagName } from '../../arm64/cpu';
 import type {
   MemoryOperand,
@@ -6,6 +7,7 @@ import type {
   RegisterOperand,
 } from '../../arm64/parser';
 import {
+  MASK_64,
   X_REGISTER_NAMES,
   formatHex,
   readRegister,
@@ -57,6 +59,17 @@ interface PointerView {
   preview: string | null;
 }
 
+interface MemoryByteView {
+  address: bigint;
+  width: number;
+  opcode: string;
+  title: string;
+  isContiguous: boolean;
+  wraps: boolean;
+  reconstructValue: boolean;
+  bytes: Array<{ address: bigint; value: number; changed: boolean; offset: bigint }>;
+}
+
 const FLAG_NAMES: FlagName[] = ['N', 'Z', 'C', 'V'];
 
 function asSet<T>(values: ChangeCollection<T>): ReadonlySet<T> {
@@ -79,12 +92,85 @@ function signedDelta(value: bigint): string {
   return `${value > 0n ? '+' : '−'}${(value > 0n ? value : -value).toString()}`;
 }
 
+function normalizeAddress(address: bigint): bigint {
+  return address & MASK_64;
+}
+
 function readMemory(memory: ReadonlyMap<bigint, number>, address: bigint, size = 8): bigint {
   let value = 0n;
   for (let offset = 0; offset < size; offset += 1) {
-    value |= BigInt(memory.get(address + BigInt(offset)) ?? 0) << BigInt(offset * 8);
+    value |= BigInt(memory.get(normalizeAddress(address + BigInt(offset))) ?? 0) << BigInt(offset * 8);
   }
   return value;
+}
+
+function buildMemoryByteView(
+  direction: VisualizationTransition['direction'],
+  instruction: ParsedInstruction | null,
+  before: CPUSnapshot,
+  after: CPUSnapshot,
+  explicitChanges: ReadonlySet<bigint>,
+): MemoryByteView | null {
+  // Only a forward Step has adjacent instruction input/output snapshots. A Run
+  // may retain its final parsed instruction, but `before` is the state from the
+  // beginning of the whole Run. Using those registers to calculate the final
+  // instruction's address would invent a false per-instruction visualization.
+  const memoryOperand = direction === 'forward'
+    ? instruction?.operands.find((operand) => operand.kind === 'memory')
+    : null;
+  if (direction === 'forward' && instruction && memoryOperand?.kind === 'memory') {
+    const firstRegister = instruction.operands[0]?.kind === 'register'
+      ? instruction.operands[0]
+      : null;
+    if (!firstRegister) return null;
+    const singleWidth = instruction.opcode.endsWith('b') ? 1 : registerWidth(firstRegister.name);
+    const width = instruction.opcode === 'ldp' || instruction.opcode === 'stp'
+      ? singleWidth * 2
+      : singleWidth;
+    const address = effectiveAddress(memoryOperand, before.registers);
+    const addresses = Array.from({ length: width }, (_, index) => normalizeAddress(address + BigInt(index)));
+    return {
+      address,
+      width,
+      opcode: instruction.opcode.toUpperCase(),
+      title: 'Memory bytes for this Step',
+      isContiguous: true,
+      wraps: addresses.some((byteAddress, index) => index > 0 && byteAddress < addresses[index - 1]),
+      reconstructValue: width <= 8,
+      bytes: addresses.map((byteAddress, index) => {
+        return {
+          address: byteAddress,
+          value: after.memory.get(byteAddress) ?? 0,
+          changed: explicitChanges.has(byteAddress),
+          offset: BigInt(index),
+        };
+      }),
+    };
+  }
+
+  const changedAddresses = [...explicitChanges]
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  if (changedAddresses.length === 0) return null;
+  const isContiguous = changedAddresses.every((address, index) => (
+    index === 0 || address === changedAddresses[index - 1] + 1n
+  ));
+  return {
+    address: changedAddresses[0],
+    width: changedAddresses.length,
+    opcode: direction === 'back' ? 'RESTORED' : 'RUN CHANGES',
+    title: direction === 'back'
+      ? 'Memory restored by Step Back'
+      : 'Memory changed during Run',
+    isContiguous,
+    wraps: false,
+    reconstructValue: false,
+    bytes: changedAddresses.map((address) => ({
+      address,
+      value: after.memory.get(address) ?? 0,
+      changed: true,
+      offset: address - changedAddresses[0],
+    })),
+  };
 }
 
 function memoryRowChanged(
@@ -130,7 +216,7 @@ function valueLabel(operand: Operand | undefined, registers: RegisterState): str
 
 function effectiveAddress(memoryOperand: MemoryOperand, registers: RegisterState): bigint {
   const base = readRegister(registers, memoryOperand.base);
-  return memoryOperand.writeback === 'post' ? base : base + memoryOperand.offset;
+  return normalizeAddress(memoryOperand.writeback === 'post' ? base : base + memoryOperand.offset);
 }
 
 function registerWidth(name: OperandRegisterName): number {
@@ -224,7 +310,7 @@ function buildDataFlow(
 
   const second = operands[1]?.kind === 'register' ? operands[1] : null;
   if (!second) return null;
-  const secondAddress = address + BigInt(firstWidth);
+  const secondAddress = normalizeAddress(address + BigInt(firstWidth));
   if (opcode === 'ldp') {
     return {
       sources: [
@@ -253,10 +339,10 @@ function buildDataFlow(
 }
 
 function printablePreview(memory: ReadonlyMap<bigint, number>, address: bigint): string | null {
-  if (!memory.has(address)) return null;
+  if (!memory.has(normalizeAddress(address))) return null;
   let preview = '';
   for (let offset = 0; offset < 32; offset += 1) {
-    const byte = memory.get(address + BigInt(offset));
+    const byte = memory.get(normalizeAddress(address + BigInt(offset)));
     if (byte === undefined || byte === 0) break;
     if (byte === 10) {
       preview += '\\n';
@@ -332,9 +418,11 @@ function stackAddresses(beforeSP: bigint, afterSP: bigint, compact: boolean): bi
 function transitionTitle(transition: VisualizationTransition): string {
   if (transition.direction === 'reset') return 'Reset CPU state';
   if (transition.direction === 'back') return transition.instruction
-    ? `Previous · undo ${transition.instruction.opcode.toUpperCase()}`
-    : 'Previous state restored';
-  if (transition.direction === 'run') return 'Run completed';
+    ? `Step Back · undo ${transition.instruction.opcode.toUpperCase()}`
+    : 'Previous snapshot restored';
+  if (transition.direction === 'run') return transition.after.halted
+    ? 'Run completed'
+    : 'Run paused at the step limit';
   return transition.instruction?.sourceText ?? 'CPU state updated';
 }
 
@@ -402,6 +490,9 @@ export function DynamicVisualizer({
   const dataFlow = direction === 'forward'
     ? buildDataFlow(instruction, executionInput, executionOutput)
     : null;
+  const memoryByteView = direction === 'reset'
+    ? null
+    : buildMemoryByteView(direction, instruction, before, after, explicitMemoryChanges);
   const stackRows = stackAddresses(before.registers.sp, after.registers.sp, compact);
   const registerChangeSet = new Set(registerChanges);
   const watchedRegisters = registerFocus
@@ -541,6 +632,55 @@ export function DynamicVisualizer({
         </section>
       )}
 
+      {shows('memory') && memoryByteView && (
+        <section
+          className="dv-card dv-memory-bytes"
+          aria-label="Little-endian memory bytes"
+          data-testid="dynamic-memory-bytes"
+        >
+          <div className="dv-section-heading">
+            <div>
+              <h3>{memoryByteView.title}</h3>
+              <span>
+                {memoryByteView.wraps
+                  ? 'Address order wraps from 0xFFFF… to zero'
+                  : memoryByteView.isContiguous ? 'Lowest address first' : 'Sorted by address'}
+              </span>
+            </div>
+            <code>{memoryByteView.opcode} · {memoryByteView.width} byte{memoryByteView.width === 1 ? '' : 's'}</code>
+          </div>
+          <div className="dv-byte-address-range">
+            <code>{formatHex(memoryByteView.address)}</code>
+            <span aria-hidden="true">
+              {memoryByteView.wraps
+                ? 'increasing address → wraps to zero'
+                : memoryByteView.isContiguous ? 'low address → high address' : 'lowest change → highest change'}
+            </span>
+            <code>{formatHex(memoryByteView.bytes.at(-1)?.address ?? memoryByteView.address)}</code>
+          </div>
+          <div
+            className="dv-byte-strip"
+            style={{ '--dv-byte-columns': Math.min(memoryByteView.bytes.length, 8) } as CSSProperties}
+          >
+            {memoryByteView.bytes.map((byte) => (
+              <div className={byte.changed ? 'dv-byte-changed' : ''} key={byte.address.toString()}>
+                <code>{byte.value.toString(16).padStart(2, '0')}</code>
+                <small>+{byte.offset.toString()}</small>
+              </div>
+            ))}
+          </div>
+          {memoryByteView.reconstructValue && memoryByteView.width > 1 && (
+            <p className="dv-endian-explanation">
+              {memoryByteView.wraps
+                ? 'Little endian stores the least-significant byte at the effective address. Following bytes use increasing addresses and wrap to zero.'
+                : 'Little endian stores the least-significant byte at the lowest address.'}{' '}
+              The {memoryByteView.width * 8}-bit value still reconstructs as{' '}
+              <code>{formatHex(readMemory(after.memory, memoryByteView.address, memoryByteView.width), memoryByteView.width * 8)}</code>.
+            </p>
+          )}
+        </section>
+      )}
+
       {shows('stack') && <section className="dv-card dv-stack" aria-labelledby={`dv-stack-title-${animationKey}`} data-testid="dynamic-stack">
         <div className="dv-section-heading">
           <div>
@@ -560,12 +700,20 @@ export function DynamicVisualizer({
           {stackRows.map((address) => {
             const isCurrentSP = address === (after.registers.sp & ~7n);
             const isOldSP = spMoved && address === (before.registers.sp & ~7n);
+            const currentSPOffset = after.registers.sp - address;
+            const oldSPOffset = before.registers.sp - address;
+            const newlyReserved = after.registers.sp < before.registers.sp
+              && address >= after.registers.sp
+              && address < before.registers.sp;
+            const newlyReleased = after.registers.sp > before.registers.sp
+              && address >= before.registers.sp
+              && address < after.registers.sp;
             const changed = memoryRowChanged(before.memory, after.memory, explicitMemoryChanges, address);
             const beforeValue = readMemory(before.memory, address);
             const afterValue = readMemory(after.memory, address);
             return (
               <div
-                className={`dv-stack-row ${isCurrentSP ? 'dv-current-sp' : ''} ${isOldSP ? 'dv-old-sp' : ''} ${changed ? 'dv-stack-changed' : ''}`}
+                className={`dv-stack-row ${isCurrentSP ? 'dv-current-sp' : ''} ${isOldSP ? 'dv-old-sp' : ''} ${newlyReserved ? 'dv-stack-reserved' : ''} ${newlyReleased ? 'dv-stack-released' : ''} ${changed ? 'dv-stack-changed' : ''}`}
                 key={address.toString()}
               >
                 <code className="dv-stack-address" title={formatHex(address)}>{shortHex(address)}</code>
@@ -574,14 +722,41 @@ export function DynamicVisualizer({
                   <code>{formatHex(afterValue)}</code>
                 </div>
                 <div className="dv-stack-markers">
-                  {isOldSP && <span className="dv-old-sp-marker">old SP</span>}
-                  {isCurrentSP && <span className="dv-sp-marker">SP</span>}
+                  {isOldSP && (
+                    <span className="dv-old-sp-marker" title={`Old SP = ${formatHex(before.registers.sp)}`}>
+                      {oldSPOffset === 0n ? 'old SP' : `old SP at row +${oldSPOffset.toString()}`}
+                    </span>
+                  )}
+                  {isCurrentSP && (
+                    <span className="dv-sp-marker" title={`SP = ${formatHex(after.registers.sp)}`}>
+                      {currentSPOffset === 0n ? 'SP' : `SP at row +${currentSPOffset.toString()}`}
+                    </span>
+                  )}
+                  {newlyReserved && <span className="dv-range-marker dv-reserved-marker">current area</span>}
+                  {newlyReleased && <span className="dv-range-marker dv-released-marker">may be reused</span>}
                   {changed && <span className="dv-write-marker">changed</span>}
                 </div>
               </div>
             );
           })}
         </div>
+        {spMoved && (
+          <p className="dv-stack-plain-meaning">
+            {after.registers.sp < before.registers.sp
+              ? <>
+                  SP changed <code>{formatHex(before.registers.sp)}</code> → <code>{formatHex(after.registers.sp)}</code>.{' '}
+                  Addresses <code>{formatHex(after.registers.sp)}</code> through{' '}
+                  <code>{formatHex(before.registers.sp - 1n)}</code> are now reserved as current stack space.
+                  Changing SP alone does not modify memory bytes; only a store instruction does.
+                </>
+              : <>
+                  SP changed <code>{formatHex(before.registers.sp)}</code> → <code>{formatHex(after.registers.sp)}</code>.{' '}
+                  Addresses <code>{formatHex(before.registers.sp)}</code> through{' '}
+                  <code>{formatHex(after.registers.sp - 1n)}</code> were released and may now be reused.
+                  Their stored bytes remain until later code overwrites them.
+                </>}
+          </p>
+        )}
         <div className="dv-stack-direction">Lower addresses <b aria-hidden="true">↓</b></div>
       </section>}
 

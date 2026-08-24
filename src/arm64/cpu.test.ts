@@ -55,6 +55,23 @@ describe('ARM64CPU Phase 1', () => {
     expect(cpu.currentInstruction?.sourceLine).toBe(2);
   });
 
+  it('explains stack-pointer arithmetic and W-register clearing explicitly', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`sub sp, sp, #16
+add sp, sp, #16
+mov w0, 1`);
+
+    expect(cpu.step().explanation).toBe(
+      'SP moves 16 bytes lower to reserve stack space. Memory bytes are unchanged.',
+    );
+    expect(cpu.step().explanation).toBe(
+      'SP moves 16 bytes higher to release stack space. Old memory bytes are not erased.',
+    );
+    expect(cpu.step().explanation).toContain(
+      "Writing W0 also clears X0's upper 32 bits to zero.",
+    );
+  });
+
   it('reset restores all register state and PC', () => {
     const cpu = run('mov x0, 10');
     cpu.reset();
@@ -93,6 +110,27 @@ describe('ARM64CPU Phase 1', () => {
     expect(cpu.registers.x29).toBe(0x29n);
     expect(cpu.registers.x30).toBe(0x30n);
     expect(cpu.registers.sp).toBe(STACK_TOP);
+  });
+
+  it('explains pre-index and post-index addresses in the order they happen', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x29, 0x29
+mov x30, 0x30
+stp x29, x30, [sp, #-16]!
+mov x29, 0
+mov x30, 0
+ldp x29, x30, [sp], #16`);
+
+    cpu.step();
+    cpu.step();
+    expect(cpu.step().explanation).toBe(
+      'First set SP = old SP - 16; then store X29 at new SP and X30 at new SP + 8.',
+    );
+    cpu.step();
+    cpu.step();
+    expect(cpu.step().explanation).toBe(
+      'Load X29 from old SP and X30 from old SP + 8; then set SP = old SP + 16.',
+    );
   });
 
   it('implements byte loads/stores and W-register zero extension', () => {
@@ -222,6 +260,23 @@ mov x1, 1`);
     `);
     expect(branchCPU.flags.Z).toBe(true);
     expect(branchCPU.registers.x3).toBe(42n);
+  });
+
+  it('explains that CMP and TST update flags without storing their computed results', () => {
+    const comparison = new ARM64CPU();
+    comparison.loadProgram(`mov x0, 5
+cmp x0, #5
+tst x0, x0`);
+    comparison.step();
+
+    const cmp = comparison.step();
+    expect(cmp.explanation).toContain('without storing the result');
+    expect(cmp.explanation).toContain('Z = 1');
+    expect(cmp.explanation).toContain('operands are unchanged');
+
+    const tst = comparison.step();
+    expect(tst.explanation).toContain('TST computes X0 & X0 without storing the result');
+    expect(tst.explanation).toContain('NZCV is updated');
   });
 
   it('supports indirect BR and BLR targets', () => {

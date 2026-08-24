@@ -1,6 +1,63 @@
 import type { DiagramKind } from '../../learning/types';
+import {
+  AdvancedConceptScene,
+  type AdvancedConceptKind,
+} from './AdvancedConceptScenes';
+import {
+  ControlConceptScene,
+  type ControlConceptSceneKind,
+} from './ControlConceptScenes';
+import {
+  FoundationConceptScene,
+  type FoundationConceptKind,
+} from './FoundationConceptScenes';
 
-const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: string }> = {
+const FOUNDATION_SCENE_BY_KIND: Partial<Record<DiagramKind, FoundationConceptKind>> = {
+  'mental-model': 'cpu-state',
+  arithmetic: 'arithmetic-flow',
+  'address-number': 'address-pointer',
+  'load-store': 'memory-offset',
+  'stack-value': 'stack-value-five-steps',
+};
+
+const CONTROL_SCENE_BY_KIND: Partial<Record<DiagramKind, ControlConceptSceneKind>> = {
+  'cmp-zero': 'cmp-zero',
+  'signed-flags': 'signed-flags',
+  'ordered-branch': 'ordered-branch',
+  'bl-only': 'bl-only',
+  'return-flow': 'return-flow',
+  'function-arguments': 'function-arguments',
+  'function-result': 'function-result',
+  'save-lr-cycle': 'save-lr-cycle',
+  'pair-transfer': 'pair-transfer',
+  'stack-frame-flow': 'stack-frame-flow',
+  'nested-return-addresses': 'nested-return-addresses',
+};
+
+const ADVANCED_SCENE_BY_KIND: Partial<Record<DiagramKind, AdvancedConceptKind>> = {
+  'code-data-sections': 'code-data-sections',
+  'string-bytes': 'string-bytes',
+  'label-address': 'label-address',
+  'syscall-boundary': 'syscall-boundary',
+  'write-bytes': 'write-bytes',
+  'disassembly-anatomy': 'disassembly-anatomy',
+  'c-mapping': 'c-mapping',
+  'debug-snapshot': 'debug-snapshot',
+  'indirect-control': 'indirect-control',
+  'native-workflow': 'native-workflow',
+
+  // Keep existing lessons compatible while their public diagram names remain stable.
+  'code-sections': 'code-data-sections',
+  'data-bytes': 'string-bytes',
+  pointer: 'label-address',
+  'syscall-gate': 'syscall-boundary',
+  syscall: 'write-bytes',
+  disassembly: 'disassembly-anatomy',
+  'debug-state': 'debug-snapshot',
+  'indirect-call': 'indirect-control',
+};
+
+const DIAGRAMS: Partial<Record<DiagramKind, { label: string; nodes: string[]; note: string }>> = {
   'mental-model': {
     label: 'Instruction execution flow',
     nodes: ['PC', 'instruction', 'registers + memory', 'next PC'],
@@ -52,9 +109,14 @@ const DIAGRAMS: Record<DiagramKind, { label: string; nodes: string[]; note: stri
     note: 'The least-significant byte is stored at the lowest address.',
   },
   'stack-growth': {
-    label: 'Stack growth',
-    nodes: ['SP = …E000', 'SUB SP, SP, #16', 'SP = …DFF0'],
-    note: 'Allocating stack space moves SP toward lower addresses.',
+    label: 'What stack memory is and how SP changes its active area',
+    nodes: ['ordinary memory bytes', 'SP = one address marker', 'newest temporary block finishes first'],
+    note: 'The stack is ordinary memory used for nested temporary blocks. SP contains one address; it does not contain the memory rows or their values.',
+  },
+  'stack-value': {
+    label: 'One stack value followed through four instructions',
+    nodes: ['SUB moves SP', 'STR writes 42', 'LDR copies 42', 'ADD moves SP'],
+    note: 'Only STR writes memory. LDR leaves the memory value in place, and ADD changes only SP.',
   },
   'register-pair': {
     label: 'Two registers stored in neighboring stack slots',
@@ -186,24 +248,77 @@ function RegisterMapDiagram() {
 
 function StackGrowthDiagram() {
   const rows = [
-    ['0x…E010', 'empty', ''],
-    ['0x…E008', 'empty', ''],
-    ['0x…E000', 'old top', 'old SP'],
-    ['0x…DFF8', 'empty', ''],
-    ['0x…DFF0', 'new top', 'SP'],
+    ['0x…E008–E00F', 'ordinary memory at a higher address', ''],
+    ['0x…E000–E007', 'ordinary memory beginning at E000', 'SP points here'],
+    ['0x…DFF8–DFFF', 'eight bytes below the current SP', ''],
+    ['0x…DFF0–DFF7', 'sixteen bytes below the current SP', ''],
   ];
   return (
     <div className="stack-concept-scene" aria-hidden="true">
-      <div className="stack-address-direction"><span>Higher addresses</span><strong>↑</strong></div>
-      <div className="stack-concept-rows">
-        {rows.map(([address, value, marker]) => (
-          <div className={`stack-concept-row ${marker === 'SP' ? 'stack-new-sp' : ''}`} key={address}>
-            <code>{address}</code><span>{value}</span><strong>{marker}</strong>
+      <div className="stack-definition-card">
+        <header>
+          <span>STACK</span>
+          <strong>A region of ordinary memory used as temporary workspace</strong>
+        </header>
+        <div className="stack-purpose-grid">
+          <span><strong>Temporary values</strong><small>data needed for a short time</small></span>
+          <span><strong>Saved CPU values</strong><small>copies needed again later</small></span>
+          <span><strong>Nested work</strong><small>new blocks below older blocks</small></span>
+        </div>
+        <div className="stack-lifo-strip">
+          <span><small>older block</small><strong>block A</strong></span>
+          <span className="stack-lifo-new"><small>newest block</small><strong>block B</strong></span>
+          <em>block B finishes first ← last in, first out</em>
+        </div>
+      </div>
+      <div className="stack-only-rule">
+        <strong>SP is only an address marker</strong>
+        <span>At the start of this example, SP contains 0x…E000.</span>
+      </div>
+      <div className="stack-spatial-direction"><span>Higher addresses</span><strong>↑</strong></div>
+      <div className="stack-spatial-map">
+        {rows.map(([address, meaning, marker]) => (
+          <div className={marker ? 'stack-spatial-sp' : ''} key={address}>
+            <code>{address}</code>
+            <span>{meaning}</span>
+            <strong>{marker}</strong>
           </div>
         ))}
       </div>
-      <div className="stack-move-label"><code>SUB SP, SP, #16</code><span>SP moves down 16 bytes ↓</span></div>
-      <div className="stack-address-direction"><strong>↓</strong><span>Lower addresses</span></div>
+      <div className="stack-spatial-direction"><strong>↓</strong><span>Lower addresses</span></div>
+      <div className="stack-meaning-key">
+        <span><strong>Memory rows stay put.</strong> Later SUB/ADD instructions move only the SP marker between addresses.</span>
+        <span><strong>Values live in memory.</strong> SP stores the address of a row, not the row’s contents.</span>
+      </div>
+    </div>
+  );
+}
+
+function StackValueDiagram() {
+  const steps = [
+    ['1', 'SUB', 'SP: E000 → DFF0', 'Memory unchanged'],
+    ['2', 'STR', 'X0 stays 42', '[DFF0] becomes 42'],
+    ['3', 'LDR', 'X1 becomes 42', '[DFF0] stays 42'],
+    ['4', 'ADD', 'SP: DFF0 → E000', 'Old 42 remains, but is reusable'],
+  ];
+  return (
+    <div className="stack-value-scene" aria-hidden="true">
+      <div className="stack-value-track">
+        {steps.map(([number, opcode, registerEffect, memoryEffect], index) => (
+          <div className="stack-value-group" key={opcode}>
+            <article className={`stack-value-step stack-value-${opcode.toLowerCase()}`}>
+              <header><span>{number}</span><strong>{opcode}</strong></header>
+              <code>{registerEffect}</code>
+              <p>{memoryEffect}</p>
+            </article>
+            {index < steps.length - 1 && <span className="stack-value-arrow">→</span>}
+          </div>
+        ))}
+      </div>
+      <div className="stack-value-summary">
+        <strong>42 is copied, not moved</strong>
+        <span>STR puts a copy in memory. LDR puts another copy in X1. ADD does not touch either copy.</span>
+      </div>
     </div>
   );
 }
@@ -266,24 +381,75 @@ function IndexedAddressingDiagram() {
   );
 }
 
+function UnconditionalBranchDiagram() {
+  return (
+    <div className="branch-always-scene" aria-hidden="true">
+      <div className="branch-path-origin">
+        <span>CURRENT INSTRUCTION</span>
+        <code>b end</code>
+        <strong>B always chooses its label</strong>
+      </div>
+      <div className="branch-path-fork">
+        <div className="branch-path-taken">
+          <span>TAKEN</span>
+          <strong>PC → end</strong>
+          <code>end: mov x1, x0</code>
+        </div>
+        <div className="branch-path-skipped">
+          <span>SKIPPED</span>
+          <code>mov x0, 99</code>
+          <small>This sequential instruction never executes.</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConditionalBranchDiagram() {
+  return (
+    <div className="branch-condition-scene" aria-hidden="true">
+      <div className="branch-condition-rule">
+        <strong>B.NE asks one question</strong>
+        <code>Is Z = 0?</code>
+      </div>
+      <div className="branch-condition-cases">
+        <div className="branch-condition-case branch-condition-taken">
+          <span>THIS EXAMPLE</span>
+          <code>Z = 0</code>
+          <strong>YES → branch to notequal</strong>
+          <small>PC receives the target address.</small>
+        </div>
+        <div className="branch-condition-case branch-condition-fallthrough">
+          <span>OTHER POSSIBILITY</span>
+          <code>Z = 1</code>
+          <strong>NO → continue downward</strong>
+          <small>PC selects the following instruction.</small>
+        </div>
+      </div>
+      <p>CMP created Z. B.NE reads it; neither path changes the flag.</p>
+    </div>
+  );
+}
+
 function FramePointerDiagram() {
   return (
     <div className="frame-pointer-scene" aria-hidden="true">
       <div className="frame-pointer-phase">
         <span>Before</span>
-        <code>SP → current frame</code>
+        <code>SP → 0x…DFE0</code>
+        <strong>X29 has its older value</strong>
       </div>
       <span className="frame-pointer-arrow">→</span>
       <div className="frame-pointer-phase frame-pointer-anchor">
-        <span>Execute</span>
+        <span>After MOV</span>
         <code>mov x29, sp</code>
-        <strong>SP + X29 → frame</strong>
+        <strong>SP and X29 both point to 0x…DFE0</strong>
       </div>
       <span className="frame-pointer-arrow">→</span>
       <div className="frame-pointer-phase">
-        <span>After SP moves</span>
-        <code>SP → lower address</code>
-        <strong>X29 → original frame</strong>
+        <span>After a later SUB</span>
+        <code>SP → 0x…DFD0</code>
+        <strong>X29 stays → 0x…DFE0</strong>
       </div>
     </div>
   );
@@ -306,17 +472,33 @@ function EndianDiagram() {
 }
 
 export function ConceptDiagram({ kind }: { kind: DiagramKind }) {
+  const foundationKind = FOUNDATION_SCENE_BY_KIND[kind];
+  if (foundationKind) return <FoundationConceptScene kind={foundationKind} />;
+
+  const controlKind = CONTROL_SCENE_BY_KIND[kind];
+  if (controlKind) return <ControlConceptScene kind={controlKind} />;
+
+  const advancedKind = ADVANCED_SCENE_BY_KIND[kind];
+  if (advancedKind) return <AdvancedConceptScene kind={advancedKind} />;
+
   const diagram = DIAGRAMS[kind];
+  if (!diagram) throw new Error(`No concept diagram registered for: ${kind}`);
   const specialized = kind === 'register-map'
     ? <RegisterMapDiagram />
     : kind === 'pointer'
       ? <PointerDiagram />
     : kind === 'stack-growth'
       ? <StackGrowthDiagram />
+      : kind === 'stack-value'
+        ? <StackValueDiagram />
       : kind === 'lr-overwrite'
         ? <LinkRegisterOverwriteDiagram />
         : kind === 'indexed-addressing'
           ? <IndexedAddressingDiagram />
+          : kind === 'unconditional-branch'
+            ? <UnconditionalBranchDiagram />
+            : kind === 'control-flow'
+              ? <ConditionalBranchDiagram />
           : kind === 'frame-pointer'
             ? <FramePointerDiagram />
       : kind === 'stack-frame'

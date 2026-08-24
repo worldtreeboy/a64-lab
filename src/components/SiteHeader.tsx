@@ -41,9 +41,9 @@ export function SiteHeader({
             onChange={(event) => onThemeChange(event.target.value as AppTheme)}
             aria-label="Theme"
           >
+            <option value="cyberpunk">Cyberpunk HUD</option>
             <option value="debugger">Debugger</option>
             <option value="monochrome">Black / White</option>
-            <option value="cyberpunk">Cyberpunk</option>
           </select>
         </label>
       </div>

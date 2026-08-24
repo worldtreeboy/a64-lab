@@ -93,28 +93,26 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
   const run = useCallback(() => {
     if (sourceDirty && !loadSource()) return;
     const before = cpu.snapshot();
-    const allChanges = new Set<RegisterName>();
-    const allFlagChanges = new Set<FlagName>();
-    const allMemoryChanges = new Set<bigint>();
     let finalInstruction: string | null = null;
     let finalParsedInstruction = null as ReturnType<typeof cpu.step>['executed'];
     let steps = 0;
     while (!cpu.halted && steps < 10_000) {
       const result = cpu.step();
-      result.changedRegisters.forEach((name) => allChanges.add(name));
-      result.changedFlags.forEach((name) => allFlagChanges.add(name));
-      result.changedMemory.forEach((address) => allMemoryChanges.add(address));
       finalInstruction = result.executed?.sourceText ?? finalInstruction;
       finalParsedInstruction = result.executed ?? finalParsedInstruction;
       steps += 1;
     }
-    setChangedRegisters(allChanges);
-    setChangedFlags(allFlagChanges);
-    setChangedMemory([...allMemoryChanges]);
     setLastInstruction(finalInstruction);
     setError(steps >= 10_000 && !cpu.halted ? 'Run paused after 10,000 steps. The program may contain a loop.' : null);
     setErrorLine(null);
     const after = cpu.snapshot();
+    // Run visualizations compare the complete before/after snapshots. This
+    // intentionally shows the Run's net memory result instead of pretending
+    // the endpoint snapshots surround only the final instruction.
+    const netChanges = diffSnapshots(before, after);
+    setChangedRegisters(new Set(netChanges.registers));
+    setChangedFlags(new Set(netChanges.flags));
+    setChangedMemory(netChanges.memory);
     setSnapshot(after);
     setVisualTransition(createVisualizationTransition(before, after, finalParsedInstruction, 'run'));
   }, [cpu, loadSource, sourceDirty]);
@@ -229,12 +227,14 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
           source={source}
           currentLine={currentLine}
           errorLine={errorLine}
+          sourceDirty={sourceDirty}
           onChange={(nextSource) => {
             setSource(nextSource);
             setSourceDirty(true);
             setChangedRegisters(new Set());
             setChangedFlags(new Set());
             setChangedMemory([]);
+            setLastInstruction(null);
             setError(null);
             setErrorLine(null);
           }}
@@ -259,6 +259,8 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
           <MemoryViewer
             memory={snapshot.memory}
             changedMemory={changedMemory}
+            changeDirection={visualTransition.direction}
+            instructionOpcode={visualTransition.instruction?.opcode}
             suggestedAddress={snapshot.registers.sp}
             navigationRequest={memoryNavigation}
             dataSegments={cpu.program.data}
@@ -266,6 +268,12 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
         </div>
 
         <aside className="learning-sidebar panel">
+          {sourceDirty && (
+            <p className="source-state-warning" role="status">
+              <strong>Source changed.</strong> The state below belongs to the previously loaded program.
+              Step, Run, or Reset starts the edited source from a fresh state.
+            </p>
+          )}
           <DynamicVisualizer
             compact
             transition={visualTransition}
@@ -273,13 +281,20 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
           />
           <CallStackPanel frames={snapshot.callStack} />
           <SyscallPanel syscall={snapshot.lastSyscall} describeAddress={(address) => cpu.describeAddress(address)} />
-          <Terminal output={snapshot.terminalOutput} exited={snapshot.exited} exitCode={snapshot.exitCode} />
+          <Terminal
+            output={snapshot.terminalOutput}
+            exited={snapshot.exited}
+            exitCode={snapshot.exitCode}
+            halted={snapshot.halted}
+          />
           <CheatSheet />
         </aside>
 
         <ExplanationPanel
           instruction={lastInstruction}
-          explanation={snapshot.lastExplanation}
+          explanation={sourceDirty
+            ? 'Source changed. Step, Run, or Reset reloads the edited program from the beginning.'
+            : snapshot.lastExplanation}
           error={error}
           nextInstruction={sourceDirty ? null : cpu.currentInstruction?.sourceText ?? null}
         />
@@ -287,6 +302,7 @@ function App({ theme, onThemeChange, transfer }: LabPageProps) {
 
       <Controls
         halted={snapshot.halted && !sourceDirty}
+        sourceDirty={sourceDirty}
         canStep={canStep}
         canStepBack={!sourceDirty && snapshot.historyDepth > 0}
         onStep={step}

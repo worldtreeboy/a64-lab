@@ -197,8 +197,11 @@ describe('lesson content', () => {
       const lesson = rawLesson as typeof rawLesson & ProgressionMetadata;
       expect(getLesson(lesson.id)).toBe(lesson);
       expect(lesson.id).toMatch(ID_PATTERN);
-      expect(lesson.sections.length, `${lesson.id} should stay short`).toBeGreaterThanOrEqual(2);
-      expect(lesson.sections.length, `${lesson.id} should stay short`).toBeLessThanOrEqual(3);
+      expect(lesson.sections.length, `${lesson.id} needs at least a concept and an example`).toBeGreaterThanOrEqual(2);
+      expect(
+        lesson.sections.length,
+        `${lesson.id} should use no more than ten small, sequential teaching chunks`,
+      ).toBeLessThanOrEqual(10);
       expect(
         lesson.quiz.length,
         `${lesson.id} needs at least two questions so the learner checks the idea more than once`,
@@ -210,10 +213,12 @@ describe('lesson content', () => {
       expect(lesson.nextStep.length).toBeGreaterThan(20);
       expect(lesson.visualPrompt.trim().length, `${lesson.id} needs a visual teaching prompt`).toBeGreaterThanOrEqual(20);
       expect(lesson.visualFocus.length, `${lesson.id} needs a focused live visual`).toBeGreaterThan(0);
-      expect(lesson.visualFocus.length, `${lesson.id} shows too many visual systems at once`).toBeLessThanOrEqual(2);
+      const visualFocusLimit = lesson.id === 'native-code-patterns' ? 3 : 2;
+      expect(lesson.visualFocus.length, `${lesson.id} shows too many visual systems at once`).toBeLessThanOrEqual(visualFocusLimit);
       expect(new Set(lesson.visualFocus).size, `${lesson.id} repeats a visual focus`).toBe(lesson.visualFocus.length);
       expect(lesson.registerFocus.length, `${lesson.id} needs watched registers`).toBeGreaterThan(0);
-      expect(lesson.registerFocus.length, `${lesson.id} watches too many registers`).toBeLessThanOrEqual(5);
+      const registerFocusLimit = lesson.id === 'native-code-patterns' ? 6 : 5;
+      expect(lesson.registerFocus.length, `${lesson.id} watches too many registers`).toBeLessThanOrEqual(registerFocusLimit);
       expect(new Set(lesson.registerFocus).size, `${lesson.id} repeats a watched register`).toBe(lesson.registerFocus.length);
       expect(new Set(lesson.flagFocus ?? []).size, `${lesson.id} repeats a watched flag`).toBe(lesson.flagFocus?.length ?? 0);
       expect(lesson.flagFocus?.length ?? 0, `${lesson.id} watches too many flags`).toBeLessThanOrEqual(4);
@@ -257,6 +262,30 @@ describe('lesson content', () => {
         lesson.sections.filter((section) => Boolean(section.diagram)),
         `${lesson.id} should include one concept-specific visual diagram`,
       ).toHaveLength(1);
+      const diagramSectionIndex = lesson.sections.findIndex((section) => Boolean(section.diagram));
+      const firstExecutionSectionIndex = lesson.sections.findIndex((section) => (
+        Boolean(section.code) || Boolean(section.walkthrough)
+      ));
+      expect(
+        diagramSectionIndex,
+        `${lesson.id} should show its concept visual before its first execution example`,
+      ).toBeLessThanOrEqual(firstExecutionSectionIndex);
+      expect(
+        lesson.visualPrompt,
+        `${lesson.id} visualPrompt is shown to learners and must not contain an implementation instruction`,
+      ).not.toMatch(/\b(draw|animate|place the listing|spotlight)\b/i);
+
+      for (const section of lesson.sections) {
+        if (!section.walkthrough) continue;
+        expect(
+          section.walkthrough.execute,
+          `${lesson.id}/${section.id} should teach one instruction or setup action at a time`,
+        ).not.toMatch(/[;\n]|\bthen\b|\bfollowed by\b/i);
+        expect(
+          section.walkthrough.execute,
+          `${lesson.id}/${section.id} needs one concrete action`,
+        ).toMatch(/^(?:mov|add|sub|cmp|tst|b(?:\.[a-z]+)?|bl|br|blr|ret|ldr|str|ldrb|strb|ldp|stp|svc)\b|^Load the program\b/i);
+      }
       expect(lesson.estimatedMinutes).toBeGreaterThanOrEqual(5);
       expect(lesson.estimatedMinutes).toBeLessThanOrEqual(15);
     }
@@ -311,6 +340,64 @@ describe('lesson content', () => {
     }
   });
 
+  it('labels arbitrary-wide MOV immediates as simulator shorthand before first use', () => {
+    const lesson = getLesson('x-w-registers')!;
+    const shorthandIndex = lesson.sections.findIndex((section) => section.id === 'wide-mov-simulator-shorthand');
+    const firstCodeIndex = lesson.sections.findIndex((section) => Boolean(section.code));
+    const shorthand = lesson.sections[shorthandIndex];
+
+    expect(shorthandIndex).toBeGreaterThanOrEqual(0);
+    expect(shorthandIndex).toBeLessThan(firstCodeIndex);
+    expect(`${shorthand?.paragraphs.join(' ')} ${shorthand?.callout}`).toMatch(/A64 Lab accepts any 64-bit constant/i);
+    expect(`${shorthand?.paragraphs.join(' ')} ${shorthand?.callout}`).toMatch(/real A64 instruction cannot/i);
+    expect(`${shorthand?.paragraphs.join(' ')} ${shorthand?.callout}`).toMatch(/MOVZ.*MOVK|memory/i);
+  });
+
+  it('teaches and executes the supported one-byte memory operations and TST', () => {
+    const taughtText = LESSONS.flatMap((lesson) => lesson.sections)
+      .flatMap((section) => [section.title, ...section.paragraphs, section.walkthrough?.execute ?? ''])
+      .join(' ');
+    expect(taughtText).toMatch(/\bLDRB\b/);
+    expect(taughtText).toMatch(/\bSTRB\b/);
+    expect(taughtText).toMatch(/\bTST\b/);
+
+    const memoryProgram = parseProgram(getLesson('memory-ldr-str')!.labProgram!);
+    expect(memoryProgram.instructions.map((instruction) => instruction.opcode)).toEqual(expect.arrayContaining(['ldrb', 'strb']));
+    const memory = runProgram(getLesson('memory-ldr-str')!.labProgram!);
+    expect(memory.registers.x2).toBe(42n);
+    expect(memory.registers.x4).toBe(0x34n);
+    expect(memory.memory.readByte(DATA_BASE)).toBe(0x34);
+
+    const compareProgram = parseProgram(getLesson('cmp-nzcv')!.labProgram!);
+    expect(compareProgram.instructions.map((instruction) => instruction.opcode)).toContain('tst');
+    const comparison = runProgram(getLesson('cmp-nzcv')!.labProgram!);
+    expect(comparison.registers.x0).toBe(0x10n);
+    expect(comparison.registers.x1).toBe(0x0fn);
+    expect(comparison.flags).toEqual({ N: false, Z: true, C: false, V: false });
+  });
+
+  it('keeps the debugger snapshot program and final integration visual focus exact', () => {
+    const debugLesson = getLesson('debugging-state')!;
+    const debugProgram = parseProgram(debugLesson.labProgram!);
+    expect(debugProgram.instructions.map((instruction) => instruction.sourceText)).toEqual([
+      'mov x1, 0x4141414141414141',
+      'mov x29, sp',
+      'sub sp, sp, #32',
+      'mov x30, 0x4141414141414141',
+    ]);
+    const debug = runProgram(debugLesson.labProgram!);
+    expect(debug.registers.pc).toBe(0x10n);
+    expect(debug.registers.x1).toBe(0x4141_4141_4141_4141n);
+    expect(debug.registers.x30).toBe(0x4141_4141_4141_4141n);
+    expect(debug.registers.x29).toBe(STACK_TOP);
+    expect(debug.registers.sp).toBe(STACK_TOP - 32n);
+
+    const integration = getLesson('native-code-patterns')!;
+    expect(integration.registerFocus).toContain('x1');
+    expect(integration.visualFocus).toEqual(expect.arrayContaining(['stack', 'calls', 'flags']));
+    expect(integration.flagFocus).toEqual(['Z']);
+  });
+
   it('executes the arithmetic lesson with X2 equal to 30', () => {
     const cpu = runProgram(`mov x0, 10
 mov x1, 20
@@ -327,7 +414,8 @@ add x2, x0, x1`);
 
     const memory = runProgram(getLesson('memory-ldr-str')!.labProgram!);
     expect(memory.registers.x2).toBe(42n);
-    expect(memory.memory.read64(DATA_BASE)).toBe(42n);
+    expect(memory.registers.x4).toBe(0x34n);
+    expect(memory.memory.read64(DATA_BASE)).toBe(0x34n);
 
     const endian = runProgram(getLesson('little-endian')!.labProgram!);
     expect(Array.from({ length: 8 }, (_, index) => endian.memory.readByte(DATA_BASE + BigInt(index))))

@@ -11,8 +11,26 @@ async function waitForPaint(window) {
   })`);
 }
 
+async function waitForRouteContent(window, route) {
+  const selector = route.startsWith('/guide/')
+    ? '.lesson-section p'
+    : route === '/challenges'
+      ? '.challenge-card'
+      : '.register-row';
+  await window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+    const started = Date.now();
+    const check = () => {
+      if (document.querySelector(${JSON.stringify(selector)})) return resolve();
+      if (Date.now() - started > 5000) return reject(new Error('Timed out waiting for ${selector}'));
+      setTimeout(check, 25);
+    };
+    check();
+  })`);
+}
+
 async function loadRoute(window, route) {
   await window.loadFile(distIndex, { hash: route });
+  await waitForRouteContent(window, route);
   await waitForPaint(window);
 }
 
@@ -142,6 +160,7 @@ app.whenReady().then(async () => {
     app.exit(valid ? 0 : 1);
   } catch (error) {
     console.error(error);
+    console.error(JSON.stringify({ consoleErrors: errors, route: window.webContents.getURL() }));
     app.exit(1);
   }
 });

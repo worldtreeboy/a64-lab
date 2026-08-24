@@ -10,6 +10,13 @@ import type { CPUFlags, FlagName } from '../arm64/cpu';
 
 export type NumberFormat = 'hex' | 'decimal';
 
+const FLAG_MEANINGS: Record<FlagName, string> = {
+  N: 'negative result / sign bit',
+  Z: 'zero result / equal comparison',
+  C: 'carry, or no borrow after subtraction',
+  V: 'signed overflow',
+};
+
 interface RegisterPanelProps {
   registers: RegisterState;
   changedRegisters: ReadonlySet<RegisterName>;
@@ -54,23 +61,45 @@ export function RegisterPanel({
           <h2>Registers</h2>
         </div>
         <div className="register-controls">
-          <div className="segmented" aria-label="Register width">
-            <button className={registerWidth === 'x' ? 'active' : ''} onClick={() => setRegisterWidth('x')}>X</button>
-            <button className={registerWidth === 'w' ? 'active' : ''} onClick={() => setRegisterWidth('w')}>W</button>
+          <div className="segmented" aria-label="General register width">
+            <button
+              type="button"
+              aria-pressed={registerWidth === 'x'}
+              className={registerWidth === 'x' ? 'active' : ''}
+              onClick={() => setRegisterWidth('x')}
+            >X · 64-bit</button>
+            <button
+              type="button"
+              aria-pressed={registerWidth === 'w'}
+              className={registerWidth === 'w' ? 'active' : ''}
+              onClick={() => setRegisterWidth('w')}
+            >W · 32-bit</button>
           </div>
           <div className="segmented" aria-label="Register number format">
-            <button className={numberFormat === 'hex' ? 'active' : ''} onClick={() => onNumberFormatChange('hex')}>HEX</button>
-            <button className={numberFormat === 'decimal' ? 'active' : ''} onClick={() => onNumberFormatChange('decimal')}>DEC</button>
+            <button
+              type="button"
+              aria-pressed={numberFormat === 'hex'}
+              className={numberFormat === 'hex' ? 'active' : ''}
+              onClick={() => onNumberFormatChange('hex')}
+            >HEX</button>
+            <button
+              type="button"
+              aria-pressed={numberFormat === 'decimal'}
+              className={numberFormat === 'decimal' ? 'active' : ''}
+              onClick={() => onNumberFormatChange('decimal')}
+            >UNSIGNED DEC</button>
           </div>
         </div>
       </div>
 
-      <div className="flags-strip" aria-label="NZCV flags">
-        <span className="flags-label">NZCV</span>
+      <div className="flags-strip" aria-label="Condition flags, NZCV">
+        <span className="flags-label">CONDITION FLAGS · NZCV</span>
         {(Object.keys(flags) as FlagName[]).map((name) => (
           <div
             className={`flag ${flags[name] ? 'flag-set' : ''} ${changedFlags.has(name) ? 'flag-changed' : ''}`}
             key={name}
+            aria-label={`${name}: ${FLAG_MEANINGS[name]}; ${flags[name] ? 'set to 1' : 'clear at 0'}`}
+            title={`${name} = ${FLAG_MEANINGS[name]}`}
           >
             <strong>{name}</strong><span>{flags[name] ? '1' : '0'}</span>
           </div>
@@ -79,7 +108,10 @@ export function RegisterPanel({
 
       <div className="register-list">
         {registerNames.map((name) => {
-          const pointer = registerWidth === 'x' ? describePointer(registers[name], name) : null;
+          const isControlPointer = name === 'sp' || name === 'pc';
+          const shouldDescribePointer = isControlPointer
+            || (registerWidth === 'x' && registers[name] !== 0n);
+          const pointer = shouldDescribePointer ? describePointer(registers[name], name) : null;
           return (
             <div
               className={`register-row ${changedRegisters.has(name) ? 'changed' : ''} ${
@@ -115,7 +147,10 @@ export function RegisterPanel({
         <span className="note-icon">i</span>
         <p>
           <strong>{registerWidth === 'w' ? 'W view:' : 'X/W relationship:'}</strong>{' '}
-          W0–W30 show the lower 32 bits of X0–X30. Writing W0 zero-extends into X0.
+          W0–W30 show the lower 32 bits—the rightmost eight hex digits—of X0–X30.
+          Writing a W register also clears its X register’s upper 32 bits to zero. SP and PC stay 64-bit.
+          {' '}<strong>Flags:</strong> N = negative/sign, Z = zero/equal, C = carry/no borrow,
+          and V = signed overflow.
         </p>
       </div>
     </section>

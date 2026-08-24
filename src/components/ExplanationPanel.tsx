@@ -11,11 +11,15 @@ export function ExplanationPanel({
   error,
   nextInstruction,
 }: ExplanationPanelProps) {
+  const executionPaused = error?.startsWith('Run paused') ?? false;
+  const heading = error
+    ? executionPaused ? 'EXECUTION PAUSED' : 'ASSEMBLY ERROR'
+    : instruction ? 'LAST INSTRUCTION' : 'STATUS';
   return (
-    <section className={`panel explanation-panel ${error ? 'has-error' : ''}`}>
-      <div className="explanation-icon">{error ? '!' : '→'}</div>
+    <section className={`panel explanation-panel ${error ? executionPaused ? 'has-warning' : 'has-error' : ''}`}>
+      <div className="explanation-icon">{error ? executionPaused ? 'Ⅱ' : '!' : '→'}</div>
       <div>
-        <span className="eyebrow">{error ? 'ASSEMBLY ERROR' : 'LAST INSTRUCTION'}</span>
+        <span className="eyebrow">{heading}</span>
         {instruction && <code className="instruction-label">{instruction}</code>}
         <p>{error ?? explanation}</p>
       </div>

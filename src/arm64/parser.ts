@@ -130,6 +130,9 @@ function parseSimpleOperand(
   line: number,
 ): RegisterOperand | ImmediateOperand | LabelOperand | LiteralLabelOperand {
   const normalized = token.trim().toLowerCase();
+  if (normalized === 'pc') {
+    throw new AssemblyParseError('PC is controlled by branches and cannot be used as a general instruction operand', line);
+  }
   if (isRegisterName(normalized)) return { kind: 'register', name: normalized };
   if (normalized.startsWith('=') && LABEL_PATTERN.test(normalized.slice(1))) {
     return { kind: 'literal-label', name: normalized.slice(1) };
@@ -197,8 +200,9 @@ function parseOperands(source: string, line: number): Operand[] {
   return operands;
 }
 
-function expectRegister(operand: Operand | undefined, message: string, line: number): void {
+function expectRegister(operand: Operand | undefined, message: string, line: number): RegisterOperand {
   if (operand?.kind !== 'register') throw new AssemblyParseError(message, line);
+  return operand;
 }
 
 function expectMemory(operand: Operand | undefined, line: number): void {
@@ -207,6 +211,49 @@ function expectMemory(operand: Operand | undefined, line: number): void {
 
 function expectLabel(operand: Operand | undefined, line: number): void {
   if (operand?.kind !== 'label') throw new AssemblyParseError('Expected a code label', line);
+}
+
+function isGeneralRegister(register: RegisterOperand): boolean {
+  return register.name.startsWith('x') || register.name.startsWith('w');
+}
+
+function expectGeneralRegister(
+  operand: Operand | undefined,
+  role: string,
+  line: number,
+): RegisterOperand {
+  const register = expectRegister(operand, `${role} must be a register`, line);
+  if (!isGeneralRegister(register)) {
+    throw new AssemblyParseError(`${role} must be an X or W register`, line);
+  }
+  return register;
+}
+
+function expectXRegister(operand: Operand | undefined, role: string, line: number): RegisterOperand {
+  const register = expectRegister(operand, `${role} must be a register`, line);
+  if (!register.name.startsWith('x')) {
+    throw new AssemblyParseError(`${role} must be a 64-bit X register`, line);
+  }
+  return register;
+}
+
+function expectWRegister(operand: Operand | undefined, role: string, line: number): RegisterOperand {
+  const register = expectRegister(operand, `${role} must be a register`, line);
+  if (!register.name.startsWith('w')) {
+    throw new AssemblyParseError(`${role} must be a 32-bit W register`, line);
+  }
+  return register;
+}
+
+function expectMatchingWidths(
+  first: RegisterOperand,
+  second: RegisterOperand,
+  context: string,
+  line: number,
+): void {
+  if (first.name[0] !== second.name[0]) {
+    throw new AssemblyParseError(`${context} registers must use the same X or W width`, line);
+  }
 }
 
 function validateInstruction(opcode: Opcode, operands: Operand[], line: number): void {
@@ -227,43 +274,93 @@ function validateInstruction(opcode: Opcode, operands: Operand[], line: number):
   }
   if (opcode === 'br' || opcode === 'blr') {
     if (operands.length !== 1) throw new AssemblyParseError(`${opcode.toUpperCase()} expects 1 operand`, line);
-    expectRegister(operands[0], 'Branch target must be a register', line);
+    expectXRegister(operands[0], 'Branch target', line);
     return;
   }
   if (opcode === 'cmp' || opcode === 'tst') {
     if (operands.length !== 2) throw new AssemblyParseError(`${opcode.toUpperCase()} expects 2 operands`, line);
-    expectRegister(operands[0], 'First comparison operand must be a register', line);
+    const first = expectGeneralRegister(operands[0], 'First comparison operand', line);
     if (operands[1]?.kind === 'memory' || operands[1]?.kind === 'label' || operands[1]?.kind === 'literal-label') {
       throw new AssemblyParseError('Invalid comparison operand', line);
+    }
+    if (operands[1]?.kind === 'register') {
+      const second = expectGeneralRegister(operands[1], 'Second comparison operand', line);
+      expectMatchingWidths(first, second, 'Comparison', line);
     }
     return;
   }
   if (opcode === 'mov') {
     if (operands.length !== 2) throw new AssemblyParseError('MOV expects 2 operands', line);
-    expectRegister(operands[0], 'Destination must be a register', line);
+    const destination = expectRegister(operands[0], 'Destination must be a register', line);
     if (operands[1]?.kind === 'memory' || operands[1]?.kind === 'label' || operands[1]?.kind === 'literal-label') {
       throw new AssemblyParseError('Invalid MOV source', line);
+    }
+    const source = operands[1];
+    if (destination.name === 'sp') {
+      if (source?.kind !== 'register' || (!source.name.startsWith('x') && source.name !== 'sp')) {
+        throw new AssemblyParseError('MOV to SP expects a 64-bit X register or SP source', line);
+      }
+      return;
+    }
+    if (!isGeneralRegister(destination)) {
+      throw new AssemblyParseError('MOV destination must be an X register, W register, or SP', line);
+    }
+    if (source?.kind === 'register') {
+      if (source.name === 'sp') {
+        if (!destination.name.startsWith('x')) {
+          throw new AssemblyParseError('MOV from SP requires a 64-bit X-register destination', line);
+        }
+      } else {
+        const sourceRegister = expectGeneralRegister(source, 'MOV source', line);
+        expectMatchingWidths(destination, sourceRegister, 'MOV', line);
+      }
     }
     return;
   }
   if (opcode === 'add' || opcode === 'sub') {
     if (operands.length !== 3) throw new AssemblyParseError(`${opcode.toUpperCase()} expects 3 operands`, line);
-    expectRegister(operands[0], 'Destination must be a register', line);
-    expectRegister(operands[1], 'First arithmetic source must be a register', line);
+    const destination = expectRegister(operands[0], 'Destination must be a register', line);
+    const firstSource = expectRegister(operands[1], 'First arithmetic source must be a register', line);
     if (operands[2]?.kind === 'memory' || operands[2]?.kind === 'label' || operands[2]?.kind === 'literal-label') {
       throw new AssemblyParseError('Invalid arithmetic source', line);
+    }
+    const secondSource = operands[2];
+    const usesSP = destination.name === 'sp'
+      || firstSource.name === 'sp'
+      || (secondSource?.kind === 'register' && secondSource.name === 'sp');
+    if (usesSP) {
+      if ((!destination.name.startsWith('x') && destination.name !== 'sp')
+        || (!firstSource.name.startsWith('x') && firstSource.name !== 'sp')) {
+        throw new AssemblyParseError('SP arithmetic uses 64-bit X registers', line);
+      }
+      if (secondSource?.kind !== 'immediate') {
+        throw new AssemblyParseError('SP arithmetic in this educational subset expects an immediate third operand', line);
+      }
+      return;
+    }
+    const generalDestination = expectGeneralRegister(destination, 'Arithmetic destination', line);
+    const generalFirstSource = expectGeneralRegister(firstSource, 'First arithmetic source', line);
+    expectMatchingWidths(generalDestination, generalFirstSource, 'Arithmetic', line);
+    if (secondSource?.kind === 'register') {
+      const generalSecondSource = expectGeneralRegister(secondSource, 'Second arithmetic source', line);
+      expectMatchingWidths(generalDestination, generalSecondSource, 'Arithmetic', line);
     }
     return;
   }
   if (opcode === 'ldp' || opcode === 'stp') {
     if (operands.length !== 3) throw new AssemblyParseError(`${opcode.toUpperCase()} expects 3 operands`, line);
-    expectRegister(operands[0], 'First operand must be a register', line);
-    expectRegister(operands[1], 'Second operand must be a register', line);
+    const first = expectGeneralRegister(operands[0], 'First pair operand', line);
+    const second = expectGeneralRegister(operands[1], 'Second pair operand', line);
+    expectMatchingWidths(first, second, opcode.toUpperCase(), line);
     expectMemory(operands[2], line);
     return;
   }
   if (operands.length !== 2) throw new AssemblyParseError(`${opcode.toUpperCase()} expects 2 operands`, line);
-  expectRegister(operands[0], 'First operand must be a register', line);
+  if (opcode === 'ldrb' || opcode === 'strb') {
+    expectWRegister(operands[0], `${opcode.toUpperCase()} data operand`, line);
+  } else {
+    expectGeneralRegister(operands[0], `${opcode.toUpperCase()} data operand`, line);
+  }
   if (opcode === 'ldr' && operands[1]?.kind === 'literal-label') return;
   expectMemory(operands[1], line);
 }
