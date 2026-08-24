@@ -190,6 +190,21 @@ add x1, x0, #5`;
 });
 
 describe('learning routes and navigation', () => {
+  it('keeps the exact stack-byte breakdown in a closed optional disclosure', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRoutes(['/guide/stack']);
+    const summary = screen.getByText('Want to see exactly which 16 bytes were reserved?');
+    const details = summary.closest('details') as HTMLDetailsElement | null;
+
+    expect(details).toBeTruthy();
+    expect(details?.open).toBe(false);
+    expect(container.querySelector('.concept-diagram')?.textContent).not.toContain('DFFF');
+    expect(screen.getByTestId('dynamic-stack').textContent).not.toMatch(/DFF8|DFFF/);
+    await user.click(summary);
+    expect(details?.open).toBe(true);
+    expect(details?.textContent).toContain('DFF8 through DFFF');
+  });
+
   it('shows inline lesson terms with apostrophes instead of backticks', () => {
     const arithmetic = renderRoutes(['/guide/mov-arithmetic']);
     const lessonView = document.querySelector('.lesson-view');
@@ -320,6 +335,10 @@ describe('focused live lesson visualizations', () => {
     expect(initialSp).toBeTruthy();
 
     await stepLiveDemo(user);
+    expect(screen.getByTestId('visual-phase-after')
+      .querySelector('[data-register="sp"] code')?.textContent).toBe(initialSp);
+
+    await stepLiveDemo(user);
     let context = screen.getByTestId('dynamic-context');
     expect(context.querySelector('[data-register="sp"]')).toBeTruthy();
     expect(context.querySelector('[data-register="x29"]')).toBeNull();
@@ -327,6 +346,9 @@ describe('focused live lesson visualizations', () => {
     const movedSp = screen.getByTestId('visual-phase-after')
       .querySelector('[data-register="sp"] code')?.textContent;
     expect(movedSp).not.toBe(initialSp);
+    const simpleStack = screen.getByTestId('dynamic-stack');
+    expect(simpleStack.textContent).toContain('16 bytes are reserved; memory contents did not change');
+    expect(simpleStack.textContent).not.toMatch(/DFF8|DFFF/);
 
     await user.click(within(currentLiveDemo()).getByRole('button', { name: 'Previous' }));
     context = screen.getByTestId('dynamic-context');

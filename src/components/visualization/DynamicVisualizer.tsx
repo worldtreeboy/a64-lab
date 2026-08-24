@@ -15,7 +15,7 @@ import {
   type RegisterName,
   type RegisterState,
 } from '../../arm64/registers';
-import type { LessonVisualFocus } from '../../learning/types';
+import type { LessonVisualFocus, StackVisualizationMode } from '../../learning/types';
 import '../../visualizations.css';
 
 type ChangeCollection<T> = readonly T[] | ReadonlySet<T>;
@@ -38,6 +38,7 @@ export interface DynamicVisualizerProps {
   focus?: readonly LessonVisualFocus[];
   flagFocus?: readonly FlagName[];
   registerFocus?: readonly RegisterName[];
+  stackVisualization?: StackVisualizationMode;
 }
 
 interface FlowNode {
@@ -70,7 +71,19 @@ interface MemoryByteView {
   bytes: Array<{ address: bigint; value: number; changed: boolean; offset: bigint }>;
 }
 
+interface SimpleStackView {
+  stage: 'reserve' | 'use' | 'restore' | null;
+  label: string;
+  message: string;
+}
+
 const FLAG_NAMES: FlagName[] = ['N', 'Z', 'C', 'V'];
+
+const SIMPLE_STACK_STAGES = [
+  { id: 'reserve', number: '1', label: 'RESERVE', instruction: 'sub sp, sp, #16', note: 'move SP down' },
+  { id: 'use', number: '2', label: 'USE', instruction: 'str x0, [sp] → ldr x1, [sp]', note: 'store and load 42' },
+  { id: 'restore', number: '3', label: 'RESTORE', instruction: 'add sp, sp, #16', note: 'move SP back' },
+] as const;
 
 function asSet<T>(values: ChangeCollection<T>): ReadonlySet<T> {
   return values instanceof Set ? values : new Set(values);
@@ -85,6 +98,10 @@ function registerLabel(name: RegisterName | OperandRegisterName): string {
 function shortHex(value: bigint): string {
   const full = formatHex(value);
   return `0x…${full.slice(-8)}`;
+}
+
+function simpleStackAddress(value: bigint): string {
+  return `0x${formatHex(value).slice(-4)}`;
 }
 
 function signedDelta(value: bigint): string {
@@ -102,6 +119,82 @@ function readMemory(memory: ReadonlyMap<bigint, number>, address: bigint, size =
     value |= BigInt(memory.get(normalizeAddress(address + BigInt(offset))) ?? 0) << BigInt(offset * 8);
   }
   return value;
+}
+
+function buildSimpleStackView(transition: VisualizationTransition): SimpleStackView {
+  const { before, after, instruction, direction } = transition;
+  const stackOperand = instruction?.operands.find((operand) => operand.kind === 'memory');
+  const usesSP = stackOperand?.kind === 'memory' && stackOperand.base === 'sp';
+
+  if (direction === 'reset') {
+    return {
+      stage: null,
+      label: 'READY',
+      message: `SP starts at ${simpleStackAddress(after.registers.sp)}. No temporary space has been reserved yet.`,
+    };
+  }
+  if (direction === 'back') {
+    return {
+      stage: null,
+      label: 'STEP BACK',
+      message: `The previous complete state was restored. SP is now ${simpleStackAddress(after.registers.sp)}.`,
+    };
+  }
+  if (direction === 'run') {
+    return {
+      stage: 'restore',
+      label: 'CYCLE COMPLETE',
+      message: `The program reserved space, used it, and restored SP to ${simpleStackAddress(after.registers.sp)}.`,
+    };
+  }
+  if (after.registers.sp < before.registers.sp) {
+    const reservedBytes = before.registers.sp - after.registers.sp;
+    return {
+      stage: 'reserve',
+      label: 'RESERVED',
+      message: `SP moved down to ${simpleStackAddress(after.registers.sp)}. ${reservedBytes.toString()} bytes are reserved; memory contents did not change.`,
+    };
+  }
+  if (usesSP && (instruction?.opcode === 'str' || instruction?.opcode === 'strb')) {
+    const width = instruction.opcode === 'strb' ? 1 : 8;
+    const storedValue = readMemory(after.memory, after.registers.sp, width);
+    return {
+      stage: 'use',
+      label: 'VALUE STORED',
+      message: `STR stored ${storedValue.toString()} in the reserved space. SP stays at ${simpleStackAddress(after.registers.sp)}.`,
+    };
+  }
+  if (usesSP && (instruction?.opcode === 'ldr' || instruction?.opcode === 'ldrb')) {
+    const destination = instruction.operands[0];
+    const destinationLabel = destination?.kind === 'register' ? registerLabel(destination.name) : 'the register';
+    const loadedValue = destination?.kind === 'register'
+      ? readRegister(after.registers, destination.name)
+      : 0n;
+    return {
+      stage: 'use',
+      label: 'VALUE LOADED',
+      message: `LDR loaded ${loadedValue.toString()} into ${destinationLabel}. The stored copy remains in memory.`,
+    };
+  }
+  if (after.registers.sp > before.registers.sp) {
+    return {
+      stage: 'restore',
+      label: 'SP RESTORED',
+      message: `SP moved back to ${simpleStackAddress(after.registers.sp)}. The temporary space is finished; its old bytes were not erased.`,
+    };
+  }
+  if (instruction?.opcode === 'mov') {
+    return {
+      stage: null,
+      label: 'VALUE READY',
+      message: `X0 now holds ${after.registers.x0.toString()}. SP and stack memory did not change.`,
+    };
+  }
+  return {
+    stage: null,
+    label: 'NO STACK CHANGE',
+    message: `SP stays at ${simpleStackAddress(after.registers.sp)}.`,
+  };
 }
 
 function buildMemoryByteView(
@@ -474,6 +567,7 @@ export function DynamicVisualizer({
   focus,
   flagFocus,
   registerFocus,
+  stackVisualization = 'detailed',
 }: DynamicVisualizerProps) {
   const { before, after, instruction, direction } = transition;
   const explicitMemoryChanges = asSet(transition.changedMemory);
@@ -531,6 +625,9 @@ export function DynamicVisualizer({
   const stackOperand = instruction?.operands.find((operand) => operand.kind === 'memory');
   const showStackDataFlow = shows('stack') && stackOperand?.kind === 'memory' && stackOperand.base === 'sp';
   const showDataFlow = shows('registers') || shows('memory') || shows('pointers') || showStackDataFlow;
+  const simpleStackView = shows('stack') && stackVisualization === 'simple'
+    ? buildSimpleStackView(transition)
+    : null;
   const visibleFlags = flagFocus ?? FLAG_NAMES;
   const phaseBefore = direction === 'reset' ? after : before;
 
@@ -681,7 +778,39 @@ export function DynamicVisualizer({
         </section>
       )}
 
-      {shows('stack') && <section className="dv-card dv-stack" aria-labelledby={`dv-stack-title-${animationKey}`} data-testid="dynamic-stack">
+      {simpleStackView && (
+        <section
+          className="dv-card dv-stack dv-simple-stack"
+          aria-labelledby={`dv-simple-stack-title-${animationKey}`}
+          data-testid="dynamic-stack"
+        >
+          <div className="dv-section-heading">
+            <div>
+              <h3 id={`dv-simple-stack-title-${animationKey}`}>Stack · simple view</h3>
+              <span>ordinary memory</span>
+            </div>
+            <code className="dv-simple-stack-sp">SP = {simpleStackAddress(after.registers.sp)}</code>
+          </div>
+          <div className="dv-simple-stack-flow" aria-label="Reserve, use, and restore stack flow">
+            {SIMPLE_STACK_STAGES.map((stage) => (
+              <article
+                className={`dv-simple-stack-stage ${simpleStackView.stage === stage.id ? 'dv-simple-stack-active' : ''}`}
+                key={stage.id}
+              >
+                <header><span>{stage.number}</span><strong>{stage.label}</strong></header>
+                <code>{stage.instruction}</code>
+                <small>{stage.note}</small>
+              </article>
+            ))}
+          </div>
+          <div className="dv-simple-stack-status" aria-live="polite">
+            <strong>{simpleStackView.label}</strong>
+            <p>{simpleStackView.message}</p>
+          </div>
+        </section>
+      )}
+
+      {shows('stack') && stackVisualization === 'detailed' && <section className="dv-card dv-stack" aria-labelledby={`dv-stack-title-${animationKey}`} data-testid="dynamic-stack">
         <div className="dv-section-heading">
           <div>
             <h3 id={`dv-stack-title-${animationKey}`}>Stack</h3>

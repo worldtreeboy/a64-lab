@@ -693,6 +693,59 @@
   line-height: 1.65;
 }
 
+.lesson-optional-details {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cyan) 28%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+}
+
+.lesson-optional-details > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.lesson-optional-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lesson-optional-details > summary::after {
+  color: var(--cyan);
+  content: "+";
+  font: 800 16px var(--mono);
+}
+
+.lesson-optional-details[open] > summary::after {
+  content: "−";
+}
+
+.lesson-optional-details > summary > span {
+  color: var(--cyan);
+  font: 800 8px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.lesson-optional-details > summary > strong {
+  font-size: 11px;
+}
+
+.lesson-optional-details-content {
+  padding: 15px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.lesson-optional-details-content > :last-child {
+  margin-bottom: 0;
+}
+
 .state-walkthrough {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr);
@@ -1339,46 +1392,6 @@
   line-height: 1.35;
 }
 
-.stack-lifo-strip {
-  display: grid;
-  grid-template-columns: minmax(70px, 0.6fr) minmax(70px, 0.6fr) minmax(150px, 1.5fr);
-  align-items: center;
-  gap: 6px;
-}
-
-.stack-lifo-strip > span {
-  display: grid;
-  gap: 2px;
-  padding: 6px 8px;
-  border: 1px solid var(--line-bright);
-  border-radius: 4px;
-  background: var(--surface-raised);
-}
-
-.stack-lifo-strip > span small {
-  color: var(--muted);
-  font-size: 8px;
-}
-
-.stack-lifo-strip > span strong {
-  color: var(--text);
-  font: 750 10px var(--mono);
-}
-
-.stack-lifo-strip > .stack-lifo-new {
-  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
-  box-shadow: inset 0 2px var(--amber);
-}
-
-.stack-lifo-strip > em {
-  color: var(--amber);
-  font-size: 9px;
-  font-style: normal;
-  line-height: 1.4;
-  text-align: right;
-}
-
-.stack-only-rule,
 .stack-value-summary {
   display: flex;
   align-items: center;
@@ -1390,75 +1403,14 @@
   font-size: 10px;
 }
 
-.stack-only-rule strong,
 .stack-value-summary strong {
   flex: 0 0 auto;
   color: var(--cyan);
 }
 
-.stack-only-rule span,
 .stack-value-summary span {
   color: var(--text);
   line-height: 1.5;
-}
-
-.stack-spatial-direction {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 8px 2px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.stack-spatial-direction strong {
-  color: var(--cyan);
-}
-
-.stack-spatial-map {
-  display: grid;
-  gap: 5px;
-}
-
-.stack-spatial-map > div {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 88px;
-  align-items: center;
-  min-height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--surface);
-}
-
-.stack-spatial-map code {
-  padding-left: 10px;
-  color: var(--muted);
-  font: 9px var(--mono);
-}
-
-.stack-spatial-map span {
-  padding: 8px 10px;
-  border-right: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  color: var(--text);
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.stack-spatial-map strong {
-  color: var(--muted);
-  font: 750 9px var(--mono);
-  text-align: center;
-}
-
-.stack-spatial-map > .stack-spatial-sp {
-  border-color: color-mix(in srgb, var(--cyan) 52%, var(--line));
-  background: var(--cyan-dim);
-  box-shadow: inset 3px 0 var(--cyan);
-}
-
-.stack-spatial-map > .stack-spatial-sp strong {
-  color: var(--cyan);
 }
 
 .stack-phase-track {
@@ -1517,6 +1469,13 @@
   color: var(--cyan);
   background: var(--cyan-dim);
   font: 700 10px var(--mono);
+  text-align: center;
+}
+
+.stack-phase-instruction {
+  overflow-wrap: anywhere;
+  color: var(--cyan);
+  font: 800 9px/1.45 var(--mono);
   text-align: center;
 }
 
@@ -2976,25 +2935,6 @@
     grid-template-columns: 1fr;
   }
 
-  .stack-lifo-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stack-lifo-strip > em {
-    grid-column: 1 / -1;
-    text-align: left;
-  }
-
-  .stack-spatial-map > div {
-    grid-template-columns: 104px minmax(0, 1fr);
-  }
-
-  .stack-spatial-map strong {
-    grid-column: 1 / -1;
-    padding: 4px;
-    border-top: 1px solid var(--line);
-  }
-
   .stack-phase-card,
   .stack-value-step {
     min-height: 0;
@@ -3008,7 +2948,6 @@
     transform: translateX(50%) rotate(90deg);
   }
 
-  .stack-only-rule,
   .stack-value-summary {
     align-items: flex-start;
     flex-direction: column;

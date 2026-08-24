@@ -78,12 +78,20 @@ export type LessonVisualFocus =
 
 export type LessonFlagFocus = 'N' | 'Z' | 'C' | 'V';
 
+export type StackVisualizationMode = 'simple' | 'detailed';
+
 export type LessonKind = 'concept' | 'integration';
 
 export interface StateWalkthroughContent {
   before: readonly string[];
   execute: string;
   after: readonly string[];
+}
+
+export interface OptionalLessonDetails {
+  summary: string;
+  paragraphs: string[];
+  bullets?: string[];
 }
 
 export interface LessonSection {
@@ -94,6 +102,7 @@ export interface LessonSection {
   code?: string;
   codeLabel?: string;
   callout?: string;
+  details?: OptionalLessonDetails;
   diagram?: DiagramKind;
   walkthrough?: StateWalkthroughContent;
 }
@@ -115,6 +124,7 @@ export interface Lesson {
   labProgram?: string;
   nextStep: string;
   visualFocus: readonly LessonVisualFocus[];
+  stackVisualization?: StackVisualizationMode;
   registerFocus: readonly RegisterName[];
   flagFocus?: readonly LessonFlagFocus[];
   visualPrompt: string;

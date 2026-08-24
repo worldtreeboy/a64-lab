@@ -233,13 +233,13 @@ const STACK_STEPS = [
     opcode: 'SUB',
     instruction: 'sub sp, sp, #16',
     changed: 'SP: E000 → DFF0',
-    unchanged: 'DFF0–DFFF becomes usable · no bytes written',
+    unchanged: '16 byte addresses DFF0–DFFF become usable · no bytes written',
   },
   {
     number: '3',
     opcode: 'STR',
     instruction: 'str x0, [sp]',
-    changed: '[DFF0] becomes 42',
+    changed: 'DFF0–DFF7 now hold the 8-byte value 42',
     unchanged: 'X0 = 42 · SP = DFF0',
   },
   {
@@ -247,14 +247,14 @@ const STACK_STEPS = [
     opcode: 'LDR',
     instruction: 'ldr x1, [sp]',
     changed: 'X1: 0 → 42',
-    unchanged: '[DFF0] still contains 42 · SP = DFF0',
+    unchanged: 'DFF0–DFF7 still hold 42 · SP = DFF0',
   },
   {
     number: '5',
     opcode: 'ADD',
     instruction: 'add sp, sp, #16',
     changed: 'SP: DFF0 → E000',
-    unchanged: '[DFF0] still contains 42 · it may now be reused',
+    unchanged: 'DFF0–DFF7 still hold 42 · they may now be reused',
   },
 ] as const;
 
@@ -286,13 +286,13 @@ function StackValueFiveStepsScene() {
             <strong>← SP now</strong>
           </div>
           <div className="fcs-stack-address fcs-stack-reusable">
-            <code>0x7FFFFFFFDFF8</code>
-            <span>old second 8-byte slot</span>
+            <code>0x…DFF8–DFFF</code>
+            <span>old second 8-byte range</span>
             <em>may be reused</em>
           </div>
           <div className="fcs-stack-address fcs-stack-has-value">
-            <code>0x7FFFFFFFDFF0</code>
-            <span>old first 8-byte slot</span>
+            <code>0x…DFF0–DFF7</code>
+            <span>old first 8-byte range</span>
             <strong>42 remains here</strong>
           </div>
         </div>
@@ -303,7 +303,7 @@ function StackValueFiveStepsScene() {
             <div><dt>X0</dt><dd>42</dd></div>
             <div><dt>X1</dt><dd>42</dd></div>
             <div><dt>SP</dt><dd>0x…E000</dd></div>
-            <div><dt>memory at DFF0</dt><dd>still 42</dd></div>
+            <div><dt>memory at DFF0–DFF7</dt><dd>still represents 42</dd></div>
           </dl>
           <p><strong>“Finished with the space”</strong> means later stack work may overwrite it—not that ADD deleted it.</p>
         </div>

@@ -258,6 +258,40 @@ add sp, sp, #16`);
     expect(within(stack).getAllByText('0x000000000000002A').length).toBeGreaterThan(0);
   });
 
+  it('offers a simple stack view without exposing the exact byte-row breakdown', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(`mov x0, 42
+sub sp, sp, #16
+str x0, [sp]
+ldr x1, [sp]
+add sp, sp, #16`);
+    cpu.step();
+
+    const view = render(
+      <DynamicVisualizer
+        transition={stepTransition(cpu)}
+        focus={['registers', 'stack']}
+        registerFocus={['x0', 'x1', 'sp']}
+        stackVisualization="simple"
+      />,
+    );
+    const simpleStack = screen.getByTestId('dynamic-stack');
+    expect(within(simpleStack).getByText('Stack · simple view')).toBeTruthy();
+    expect(simpleStack.textContent).toContain('16 bytes are reserved; memory contents did not change');
+    expect(simpleStack.textContent).not.toMatch(/DFF8|DFFF/);
+    expect(simpleStack.querySelector('.dv-stack-row')).toBeNull();
+
+    view.rerender(
+      <DynamicVisualizer
+        transition={stepTransition(cpu)}
+        focus={['registers', 'stack']}
+        registerFocus={['x0', 'x1', 'sp']}
+        stackVisualization="simple"
+      />,
+    );
+    expect(screen.getByTestId('dynamic-stack').textContent).toContain('STR stored 42 in the reserved space');
+  });
+
   it('marks the exact offset when SP is not aligned to an eight-byte row', () => {
     const cpu = new ARM64CPU();
     cpu.loadProgram('sub sp, sp, #1');

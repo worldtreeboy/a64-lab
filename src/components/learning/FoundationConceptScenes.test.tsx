@@ -84,9 +84,10 @@ describe('FoundationConceptScene', () => {
     expect([...steps].map((step) => step.querySelector('header strong')?.textContent))
       .toEqual(['MOV', 'SUB', 'STR', 'LDR', 'ADD']);
     expect(scene.textContent).toContain('SP: E000 → DFF0');
-    expect(scene.textContent).toContain('[DFF0] becomes 42');
-    expect(scene.textContent).toContain('[DFF0] still contains 42 · it may now be reused');
-    expect(scene.textContent).toContain('0x7FFFFFFFDFF8');
+    expect(scene.textContent).toContain('DFF0–DFF7 now hold the 8-byte value 42');
+    expect(scene.textContent).toContain('DFF0–DFF7 still hold 42 · they may now be reused');
+    expect(scene.textContent).toContain('0x…DFF8–DFFF');
+    expect(scene.textContent).toContain('0x…DFF0–DFF7');
     expect(scene.textContent).toContain('0x7FFFFFFFE000');
     expect(scene.textContent).toContain('42 remains here');
     expect(scene.textContent).toContain('main non-PC effect');

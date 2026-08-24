@@ -89,17 +89,23 @@ describe('ConceptDiagram scene routing', () => {
 });
 
 describe('ConceptDiagram lesson details', () => {
-  it('explains the stack as fixed memory rows with SP as one address marker', () => {
+  it('shows the beginner stack flow as reserve, use, and restore', () => {
     const { container } = render(<ConceptDiagram kind="stack-growth" />);
 
     expect(container.textContent).toContain('A region of ordinary memory used as temporary workspace');
-    expect(container.textContent).toContain('Temporary values');
-    expect(container.textContent).toContain('Saved CPU values');
-    expect(container.textContent).toContain('Nested work');
-    expect(container.textContent).toContain('last in, first out');
-    expect(container.textContent).toContain('SP is only an address marker');
-    expect(container.textContent).toContain('Memory rows stay put');
-    expect(container.querySelectorAll('.stack-spatial-map > div')).toHaveLength(4);
+    expect(screen.getByText('one register containing an address')).toBeTruthy();
+    expect(container.textContent).toContain('reserve → use → restore');
+    const phases = [...container.querySelectorAll('.stack-phase-card')];
+    expect(phases).toHaveLength(3);
+    expect(phases.map((phase) => phase.querySelector('header strong')?.textContent))
+      .toEqual(['RESERVE', 'USE', 'RESTORE']);
+    expect(container.textContent).toContain('SP: E000 → DFF0');
+    expect(container.textContent).toContain('str x0, [sp] → ldr x1, [sp]');
+    expect(container.textContent).toContain('STR stores 42');
+    expect(container.textContent).toContain('LDR loads 42 into X1');
+    expect(container.textContent).toContain('SP: DFF0 → E000');
+    expect(container.textContent).not.toContain('DFF8');
+    expect(container.textContent).not.toContain('DFFF');
     expectExactlyOneFigure(container);
   });
 
@@ -110,8 +116,8 @@ describe('ConceptDiagram lesson details', () => {
     expect(steps).toHaveLength(5);
     expect([...steps].map((step) => step.querySelector('header strong')?.textContent))
       .toEqual(['MOV', 'SUB', 'STR', 'LDR', 'ADD']);
-    expect(container.textContent).toContain('[DFF0] becomes 42');
-    expect(container.textContent).toContain('[DFF0] still contains 42 · it may now be reused');
+    expect(container.textContent).toContain('DFF0–DFF7 now hold the 8-byte value 42');
+    expect(container.textContent).toContain('DFF0–DFF7 still hold 42 · they may now be reused');
     expect(container.textContent).toContain('42 remains here');
     expectExactlyOneFigure(container);
   });

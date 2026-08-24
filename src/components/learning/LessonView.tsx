@@ -102,6 +102,26 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
           {section.callout && (
             <div className="lesson-callout">{formatLearnerText(section.callout)}</div>
           )}
+          {section.details && (
+            <details className="lesson-optional-details">
+              <summary>
+                <span>OPTIONAL DEEP DIVE</span>
+                <strong>{formatLearnerText(section.details.summary)}</strong>
+              </summary>
+              <div className="lesson-optional-details-content">
+                {section.details.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{formatLearnerText(paragraph)}</p>
+                ))}
+                {section.details.bullets && (
+                  <ul>
+                    {section.details.bullets.map((bullet) => (
+                      <li key={bullet}>{formatLearnerText(bullet)}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
+          )}
         </section>
       ))}
 
@@ -113,6 +133,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
           focus={lesson.visualFocus}
           flagFocus={lesson.flagFocus}
           registerFocus={lesson.registerFocus}
+          stackVisualization={lesson.stackVisualization}
           visualPrompt={lesson.visualPrompt}
         />
       )}

@@ -3,7 +3,11 @@ import { ARM64CPU } from '../../arm64/interpreter';
 import type { ParsedInstruction } from '../../arm64/parser';
 import { formatHex, type RegisterName } from '../../arm64/registers';
 import { formatLearnerText } from '../../learning/learnerText';
-import type { LessonFlagFocus, LessonVisualFocus } from '../../learning/types';
+import type {
+  LessonFlagFocus,
+  LessonVisualFocus,
+  StackVisualizationMode,
+} from '../../learning/types';
 import { DynamicVisualizer } from '../visualization/DynamicVisualizer';
 import { createVisualizationTransition, diffSnapshots } from '../visualization/transitions';
 
@@ -13,6 +17,7 @@ interface LiveLessonDemoProps {
   focus: readonly LessonVisualFocus[];
   flagFocus?: readonly LessonFlagFocus[];
   registerFocus: readonly RegisterName[];
+  stackVisualization?: StackVisualizationMode;
   visualPrompt: string;
 }
 
@@ -22,6 +27,7 @@ export function LiveLessonDemo({
   focus,
   flagFocus,
   registerFocus,
+  stackVisualization,
   visualPrompt,
 }: LiveLessonDemoProps) {
   const sourceRef = useRef<HTMLPreElement>(null);
@@ -148,6 +154,7 @@ export function LiveLessonDemo({
         focus={focus}
         flagFocus={flagFocus}
         registerFocus={registerFocus}
+        stackVisualization={stackVisualization}
       />
 
       {focus.includes('terminal') && (

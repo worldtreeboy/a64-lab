@@ -424,11 +424,49 @@ add x2, x0, x1`);
 
     const stack = runProgram(getLesson('stack')!.labProgram!);
     expect(stack.registers.sp).toBe(STACK_TOP);
+    expect(stack.registers.x0).toBe(42n);
+    expect(stack.registers.x1).toBe(42n);
+    expect(stack.memory.read64(STACK_TOP - 16n)).toBe(42n);
 
     const stackValues = runProgram(getLesson('stack-values')!.labProgram!);
     expect(stackValues.registers.sp).toBe(STACK_TOP);
     expect(stackValues.registers.x1).toBe(42n);
     expect(stackValues.memory.read64(STACK_TOP - 16n)).toBe(42n);
+  });
+
+  it('keeps the main stack lesson simple and the exact byte range optional', () => {
+    const stackLesson = getLesson('stack')!;
+    const rangeSection = stackLesson.sections.find((section) => (
+      section.id === 'reserve-exact-stack-range'
+    ));
+    const mainLessonText = [
+      stackLesson.coreIdea,
+      stackLesson.visualPrompt,
+      ...stackLesson.sections.flatMap((section) => [
+        ...section.paragraphs,
+        ...(section.bullets ?? []),
+        section.callout ?? '',
+      ]),
+    ].join(' ');
+    const optionalText = [
+      ...(rangeSection?.details?.paragraphs ?? []),
+      ...(rangeSection?.details?.bullets ?? []),
+    ].join(' ');
+
+    expect(mainLessonText).toContain('Stack · ordinary memory used temporarily');
+    expect(mainLessonText).toContain('SP · a register containing an address');
+    expect(mainLessonText).toContain('reserve → use → restore');
+    expect(mainLessonText).toContain('16 bytes beginning at 0xDFF0 as reserved temporary space');
+    expect(mainLessonText).not.toMatch(/DFF7|DFF8|DFFF|hexadecimal continues|individual byte/i);
+    expect(rangeSection?.details?.summary).toBe('Want to see exactly which 16 bytes were reserved?');
+    expect(optionalText).toContain('DFF0 through DFF7');
+    expect(optionalText).toContain('DFF8 through DFFF');
+    expect(optionalText).toContain('Hexadecimal continues DFFD, DFFE, DFFF, E000');
+    expect(optionalText).toContain('E000 − 0x10 = DFF0');
+    expect(rangeSection?.diagram).toBe('stack-growth');
+    expect(stackLesson.sections[0]?.diagram).toBeUndefined();
+    expect(stackLesson.stackVisualization).toBe('simple');
+    expect(stackLesson.quiz.map((question) => question.prompt).join(' ')).not.toMatch(/DFFF|exact.*range/i);
   });
 
   it('matches the control-flow and progressive stack-frame states described by the guide', () => {

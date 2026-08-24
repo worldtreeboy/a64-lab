@@ -109,9 +109,9 @@ const DIAGRAMS: Partial<Record<DiagramKind, { label: string; nodes: string[]; no
     note: 'The least-significant byte is stored at the lowest address.',
   },
   'stack-growth': {
-    label: 'What stack memory is and how SP changes its active area',
-    nodes: ['ordinary memory bytes', 'SP = one address marker', 'newest temporary block finishes first'],
-    note: 'The stack is ordinary memory used for nested temporary blocks. SP contains one address; it does not contain the memory rows or their values.',
+    label: 'The simple reserve, use, and restore stack cycle',
+    nodes: ['stack = ordinary memory', 'SP = one address', 'reserve → use → restore'],
+    note: 'SUB moves SP to reserve temporary space. STR and LDR use that space. ADD restores SP when the work is finished.',
   },
   'stack-value': {
     label: 'One stack value followed through four instructions',
@@ -247,12 +247,36 @@ function RegisterMapDiagram() {
 }
 
 function StackGrowthDiagram() {
-  const rows = [
-    ['0x…E008–E00F', 'ordinary memory at a higher address', ''],
-    ['0x…E000–E007', 'ordinary memory beginning at E000', 'SP points here'],
-    ['0x…DFF8–DFFF', 'eight bytes below the current SP', ''],
-    ['0x…DFF0–DFF7', 'sixteen bytes below the current SP', ''],
-  ];
+  const phases = [
+    {
+      number: '1',
+      label: 'RESERVE',
+      instruction: 'sub sp, sp, #16',
+      sp: 'SP: E000 → DFF0',
+      effects: ['16 bytes reserved', 'memory contents unchanged'],
+      note: 'Move SP down to make temporary space.',
+      className: 'stack-phase-reserved',
+    },
+    {
+      number: '2',
+      label: 'USE',
+      instruction: 'str x0, [sp] → ldr x1, [sp]',
+      sp: 'SP stays DFF0',
+      effects: ['STR stores 42', 'LDR loads 42 into X1'],
+      note: 'Memory instructions use the reserved space.',
+      className: 'stack-phase-reserved',
+    },
+    {
+      number: '3',
+      label: 'RESTORE',
+      instruction: 'add sp, sp, #16',
+      sp: 'SP: DFF0 → E000',
+      effects: ['temporary space finished', 'old bytes are not erased'],
+      note: 'Move SP back when the temporary work is done.',
+      className: 'stack-phase-released',
+    },
+  ] as const;
+
   return (
     <div className="stack-concept-scene" aria-hidden="true">
       <div className="stack-definition-card">
@@ -261,34 +285,30 @@ function StackGrowthDiagram() {
           <strong>A region of ordinary memory used as temporary workspace</strong>
         </header>
         <div className="stack-purpose-grid">
-          <span><strong>Temporary values</strong><small>data needed for a short time</small></span>
-          <span><strong>Saved CPU values</strong><small>copies needed again later</small></span>
-          <span><strong>Nested work</strong><small>new blocks below older blocks</small></span>
-        </div>
-        <div className="stack-lifo-strip">
-          <span><small>older block</small><strong>block A</strong></span>
-          <span className="stack-lifo-new"><small>newest block</small><strong>block B</strong></span>
-          <em>block B finishes first ← last in, first out</em>
+          <span><strong>Stack</strong><small>ordinary memory used temporarily</small></span>
+          <span><strong>SP</strong><small>one register containing an address</small></span>
+          <span><strong>Simple cycle</strong><small>reserve → use → restore</small></span>
         </div>
       </div>
-      <div className="stack-only-rule">
-        <strong>SP is only an address marker</strong>
-        <span>At the start of this example, SP contains 0x…E000.</span>
-      </div>
-      <div className="stack-spatial-direction"><span>Higher addresses</span><strong>↑</strong></div>
-      <div className="stack-spatial-map">
-        {rows.map(([address, meaning, marker]) => (
-          <div className={marker ? 'stack-spatial-sp' : ''} key={address}>
-            <code>{address}</code>
-            <span>{meaning}</span>
-            <strong>{marker}</strong>
+      <div className="stack-phase-track">
+        {phases.map((phase, index) => (
+          <div className="stack-phase-group" key={phase.label}>
+            <article className={`stack-phase-card ${phase.className}`}>
+              <header><span>{phase.number}</span><strong>{phase.label}</strong></header>
+              <code className="stack-phase-instruction">{phase.instruction}</code>
+              <div className="stack-phase-sp">{phase.sp}</div>
+              <div className="stack-phase-slots">
+                {phase.effects.map((effect) => <code key={effect}>{effect}</code>)}
+              </div>
+              <p>{phase.note}</p>
+            </article>
+            {index < phases.length - 1 && <span className="stack-phase-arrow">→</span>}
           </div>
         ))}
       </div>
-      <div className="stack-spatial-direction"><strong>↓</strong><span>Lower addresses</span></div>
       <div className="stack-meaning-key">
-        <span><strong>Memory rows stay put.</strong> Later SUB/ADD instructions move only the SP marker between addresses.</span>
-        <span><strong>Values live in memory.</strong> SP stores the address of a row, not the row’s contents.</span>
+        <span><strong>Reserve does not mean write.</strong> SUB changes SP; STR is the instruction that changes memory.</span>
+        <span><strong>Restore does not mean erase.</strong> ADD moves SP back; old bytes may remain until overwritten.</span>
       </div>
     </div>
   );
