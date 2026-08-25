@@ -65,6 +65,10 @@ questions, and both must be answered correctly before completion unlocks.
 Results and completion are saved locally, and finishing a lesson gives a short
 reduced-motion-aware celebration.
 
+Lesson prose uses a consistent reading scale, and Assembly Example blocks use
+larger monospaced source with matching line spacing. Mobile keeps the same
+hierarchy at a slightly smaller size without removing horizontal code scrolling.
+
 ## Live visual learning
 
 The diagrams in the Lab and lesson mini-labs are generated from before/after
@@ -84,6 +88,13 @@ After Step, Run, Step Back, or Reset, the visual layer can show:
 State-change animations are brief; the Cyberpunk HUD adds slow ambient glass
 and data-flow motion. All motion respects reduced-motion preferences and
 pauses while the window is inactive.
+
+All static Guide diagrams share one outer width, spacing, and typography scale.
+The Stack & SP and Stack Values lessons add large spatial memory diagrams whose
+staged animations can be paused, replayed, restarted, or moved one stage at a
+time with Previous and Next. Address labels, memory cells, and SP annotations
+use separate columns so the layout remains readable from a wide desktop down
+to a 320 px viewport.
 
 ![A64 Lab debugger with live register, data-flow, and stack visualization](docs/a64-lab.png)
 
@@ -246,6 +257,7 @@ src/
   learning/              lesson/challenge data and local progress
   pages/                 Guide and Challenges routes
   examples/              built-in Lab programs
+  diagram-scale.css      shared width and typography scale for Guide diagrams
   App.tsx                 existing full simulator at /lab
   RouterApp.tsx           browser/Electron routing shell
 electron/                 desktop entry and runtime smoke checks

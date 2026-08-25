@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import RouterApp from './RouterApp';
 import './styles.css';
 import './learning.css';
+import './diagram-scale.css';
 
 const syncMotionState = () => {
   document.documentElement.toggleAttribute(

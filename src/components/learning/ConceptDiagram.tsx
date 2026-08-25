@@ -17,6 +17,7 @@ const FOUNDATION_SCENE_BY_KIND: Partial<Record<DiagramKind, FoundationConceptKin
   arithmetic: 'arithmetic-flow',
   'address-number': 'address-pointer',
   'load-store': 'memory-offset',
+  'stack-growth': 'stack-growth-four-stages',
   'stack-value': 'stack-value-five-steps',
 };
 
@@ -107,11 +108,6 @@ const DIAGRAMS: Partial<Record<DiagramKind, { label: string; nodes: string[]; no
     label: 'Little-endian byte order',
     nodes: ['0x1122334455667788', '88 77 66 55 44 33 22 11', 'low → high address'],
     note: 'The least-significant byte is stored at the lowest address.',
-  },
-  'stack-growth': {
-    label: 'The simple reserve, use, and restore stack cycle',
-    nodes: ['stack = ordinary memory', 'SP = one address', 'reserve → use → restore'],
-    note: 'SUB moves SP to reserve temporary space. STR and LDR use that space. ADD restores SP when the work is finished.',
   },
   'stack-value': {
     label: 'One stack value followed through four instructions',
@@ -241,74 +237,6 @@ function RegisterMapDiagram() {
         <code>MOV W0, 1</code>
         <span>clears upper 32 bits</span>
         <strong>X0 = 1</strong>
-      </div>
-    </div>
-  );
-}
-
-function StackGrowthDiagram() {
-  const phases = [
-    {
-      number: '1',
-      label: 'RESERVE',
-      instruction: 'sub sp, sp, #16',
-      sp: 'SP: E000 → DFF0',
-      effects: ['16 bytes reserved', 'memory contents unchanged'],
-      note: 'Move SP down to make temporary space.',
-      className: 'stack-phase-reserved',
-    },
-    {
-      number: '2',
-      label: 'USE',
-      instruction: 'str x0, [sp] → ldr x1, [sp]',
-      sp: 'SP stays DFF0',
-      effects: ['STR stores 42', 'LDR loads 42 into X1'],
-      note: 'Memory instructions use the reserved space.',
-      className: 'stack-phase-reserved',
-    },
-    {
-      number: '3',
-      label: 'RESTORE',
-      instruction: 'add sp, sp, #16',
-      sp: 'SP: DFF0 → E000',
-      effects: ['temporary space finished', 'old bytes are not erased'],
-      note: 'Move SP back when the temporary work is done.',
-      className: 'stack-phase-released',
-    },
-  ] as const;
-
-  return (
-    <div className="stack-concept-scene" aria-hidden="true">
-      <div className="stack-definition-card">
-        <header>
-          <span>STACK</span>
-          <strong>A region of ordinary memory used as temporary workspace</strong>
-        </header>
-        <div className="stack-purpose-grid">
-          <span><strong>Stack</strong><small>ordinary memory used temporarily</small></span>
-          <span><strong>SP</strong><small>one register containing an address</small></span>
-          <span><strong>Simple cycle</strong><small>reserve → use → restore</small></span>
-        </div>
-      </div>
-      <div className="stack-phase-track">
-        {phases.map((phase, index) => (
-          <div className="stack-phase-group" key={phase.label}>
-            <article className={`stack-phase-card ${phase.className}`}>
-              <header><span>{phase.number}</span><strong>{phase.label}</strong></header>
-              <code className="stack-phase-instruction">{phase.instruction}</code>
-              <div className="stack-phase-sp">{phase.sp}</div>
-              <div className="stack-phase-slots">
-                {phase.effects.map((effect) => <code key={effect}>{effect}</code>)}
-              </div>
-              <p>{phase.note}</p>
-            </article>
-            {index < phases.length - 1 && <span className="stack-phase-arrow">→</span>}
-          </div>
-        ))}
-      </div>
-      <div className="stack-meaning-key">
-        <span><strong>Reserve does not mean write.</strong> SUB changes SP; STR is the instruction that changes memory.</span>
-        <span><strong>Restore does not mean erase.</strong> ADD moves SP back; old bytes may remain until overwritten.</span>
       </div>
     </div>
   );
@@ -507,8 +435,6 @@ export function ConceptDiagram({ kind }: { kind: DiagramKind }) {
     ? <RegisterMapDiagram />
     : kind === 'pointer'
       ? <PointerDiagram />
-    : kind === 'stack-growth'
-      ? <StackGrowthDiagram />
       : kind === 'stack-value'
         ? <StackValueDiagram />
       : kind === 'lr-overwrite'

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DiagramKind } from '../../learning/types';
 import { ConceptDiagram } from './ConceptDiagram';
@@ -12,6 +12,7 @@ const FOUNDATION_ROUTES = [
   ['arithmetic', 'arithmetic-flow'],
   ['address-number', 'address-pointer'],
   ['load-store', 'memory-offset'],
+  ['stack-growth', 'stack-growth-four-stages'],
   ['stack-value', 'stack-value-five-steps'],
 ] as const satisfies ReadonlyArray<readonly [DiagramKind, string]>;
 
@@ -89,33 +90,43 @@ describe('ConceptDiagram scene routing', () => {
 });
 
 describe('ConceptDiagram lesson details', () => {
-  it('shows the beginner stack flow as reserve, use, and restore', () => {
+  it('shows the beginner stack flow as four spatial stack states', () => {
     const { container } = render(<ConceptDiagram kind="stack-growth" />);
 
-    expect(container.textContent).toContain('A region of ordinary memory used as temporary workspace');
-    expect(screen.getByText('one register containing an address')).toBeTruthy();
-    expect(container.textContent).toContain('reserve → use → restore');
-    const phases = [...container.querySelectorAll('.stack-phase-card')];
-    expect(phases).toHaveLength(3);
+    expect(container.querySelector('.foundation-concept-scene[data-kind="stack-growth-four-stages"]'))
+      .toBeTruthy();
+    expect(container.textContent).toContain('The stack is ordinary memory.');
+    expect(container.textContent).toContain('SP is just one register containing the address');
+    const phases = [...container.querySelectorAll('.fcs-stack-growth-panel')];
+    expect(phases).toHaveLength(4);
     expect(phases.map((phase) => phase.querySelector('header strong')?.textContent))
-      .toEqual(['RESERVE', 'USE', 'RESTORE']);
-    expect(container.textContent).toContain('SP: E000 → DFF0');
-    expect(container.textContent).toContain('str x0, [sp] → ldr x1, [sp]');
-    expect(container.textContent).toContain('STR stores 42');
-    expect(container.textContent).toContain('LDR loads 42 into X1');
-    expect(container.textContent).toContain('SP: DFF0 → E000');
-    expect(container.textContent).not.toContain('DFF8');
-    expect(container.textContent).not.toContain('DFFF');
+      .toEqual(['Before', 'Allocate 16 bytes', 'Use the stack', 'Restore']);
+    expect(container.textContent).toContain('0xE000 − 0x10 = 0xDFF0');
+    expect(container.textContent).toContain('0xDFF8');
+    expect(container.textContent).toContain('str x0, [sp]');
+    expect(container.textContent).toContain('ldr x1, [sp]');
+    expect(container.textContent).toContain('0xDFF0 + 0x10 = 0xE000');
+    expect(container.textContent).toContain('old bytes are not erased');
     expectExactlyOneFigure(container);
   });
 
   it('shows every stack-value instruction separately and keeps 42 after ADD', () => {
     const { container } = render(<ConceptDiagram kind="stack-value" />);
-    const steps = container.querySelectorAll('.fcs-stack-step');
+    const scene = screen.getByTestId('foundation-stack-value-five-steps');
+    const steps = [...container.querySelectorAll<HTMLElement>('.fcs-stack-step')];
 
     expect(steps).toHaveLength(5);
-    expect([...steps].map((step) => step.querySelector('header strong')?.textContent))
+    expect(steps.map((step) => step.querySelector('header strong')?.textContent))
       .toEqual(['MOV', 'SUB', 'STR', 'LDR', 'ADD']);
+    expect(within(scene).getAllByRole('img')).toHaveLength(5);
+    expect(container.querySelectorAll('.fcs-stack-tower-row')).toHaveLength(25);
+    expect(steps[1]?.querySelectorAll('.fcs-stack-row-reserved')).toHaveLength(2);
+    expect(steps[2]?.querySelectorAll('.fcs-stack-row-reserved')).toHaveLength(2);
+    expect(steps[2]?.querySelectorAll('.fcs-stack-row-value')).toHaveLength(1);
+    expect(steps[3]?.querySelectorAll('.fcs-stack-row-reserved')).toHaveLength(2);
+    expect(steps[3]?.querySelectorAll('.fcs-stack-row-value')).toHaveLength(1);
+    expect(steps[4]?.querySelectorAll('.fcs-stack-row-released')).toHaveLength(2);
+    expect(steps[4]?.querySelectorAll('.fcs-stack-row-value')).toHaveLength(1);
     expect(container.textContent).toContain('DFF0–DFF7 now hold the 8-byte value 42');
     expect(container.textContent).toContain('DFF0–DFF7 still hold 42 · they may now be reused');
     expect(container.textContent).toContain('42 remains here');

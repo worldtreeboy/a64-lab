@@ -434,8 +434,16 @@ add x2, x0, x1`);
     expect(stackValues.memory.read64(STACK_TOP - 16n)).toBe(42n);
   });
 
-  it('keeps the main stack lesson simple and the exact byte range optional', () => {
+  it('explains when registers are enough and when stack backup is useful', () => {
     const stackLesson = getLesson('stack')!;
+    const whySection = stackLesson.sections.find((section) => section.id === 'why-stack-exists');
+    const registerOnlySection = stackLesson.sections.find((section) => (
+      section.id === 'register-only-example'
+    ));
+    const useCasesSection = stackLesson.sections.find((section) => section.id === 'when-stack-helps');
+    const preserveSection = stackLesson.sections.find((section) => (
+      section.id === 'save-x0-across-call'
+    ));
     const rangeSection = stackLesson.sections.find((section) => (
       section.id === 'reserve-exact-stack-range'
     ));
@@ -452,19 +460,54 @@ add x2, x0, x1`);
       ...(rangeSection?.details?.paragraphs ?? []),
       ...(rangeSection?.details?.bullets ?? []),
     ].join(' ');
+    const preservationReason = preserveSection?.paragraphs.join(' ') ?? '';
 
-    expect(mainLessonText).toContain('Stack · ordinary memory used temporarily');
-    expect(mainLessonText).toContain('SP · a register containing an address');
+    expect(whySection?.diagram).toBe('stack-growth');
+    expect(stackLesson.sections[0]?.id).toBe('why-stack-exists');
+    expect(mainLessonText).toContain('Registers → fastest temporary workspace → keep values here when practical');
+    expect(mainLessonText).toContain('Stack → extra / backup workspace in memory → save or preserve values here when needed');
+    expect(mainLessonText).toMatch(/registers = immediate working area/i);
+    expect(mainLessonText).toMatch(/stack = temporary backup \/ extra working area/i);
+    const useCases = useCasesSection?.bullets?.join(' ') ?? '';
+    expect(useCases).toMatch(/more temporary values than convenient registers/i);
+    expect(useCases).toMatch(/survive a function call/i);
+    expect(useCases).toMatch(/register value must be saved and restored/i);
+    expect(useCases).toMatch(/return address must be kept safe/i);
+    expect(useCases).toMatch(/local variables or temporary data/i);
+
+    expect(registerOnlySection?.code).toBe('mov x0, 42\nadd x1, x0, #1');
+    expect(registerOnlySection?.code).not.toMatch(/\bsp\b|\[[^\]]+\]/i);
+    const registerOnly = runProgram(registerOnlySection!.code!);
+    expect(registerOnly.registers.x0).toBe(42n);
+    expect(registerOnly.registers.x1).toBe(43n);
+    expect(registerOnly.registers.sp).toBe(STACK_TOP);
+
+    expect(preservationReason).toMatch(/need the old X0 later/i);
+    expect(preservationReason).toMatch(/function call may change X0/i);
+    expect(preservationReason).toMatch(/save X0 in stack memory first/i);
+    expect(preserveSection?.code).toMatch(/sub sp, sp, #16[\s\S]*str x0, \[sp\][\s\S]*bl foo[\s\S]*ldr x0, \[sp\][\s\S]*add sp, sp, #16/);
+    const preserved = runProgram(preserveSection!.code!);
+    expect(preserved.registers.x0).toBe(42n);
+    expect(preserved.registers.sp).toBe(STACK_TOP);
+    expect(preserved.memory.read64(STACK_TOP - 16n)).toBe(42n);
+
+    expect(mainLessonText).toMatch(/SUB.*actual (?:stack )?(?:allocation|reservation)/i);
+    expect(mainLessonText).toMatch(/STR.*write/i);
+    expect(mainLessonText).toMatch(/LDR.*read/i);
+    expect(mainLessonText).toMatch(/ADD.*finish/i);
+    expect(mainLessonText).toMatch(/moving SP(?: back)? does not erase/i);
+    expect(mainLessonText).not.toMatch(/\bFP\b|\bLR\b|\bSTP\b|\bLDP\b|stack frame|allocator/i);
+
+    expect(mainLessonText).toMatch(/stack is ordinary memory/i);
+    expect(mainLessonText).toMatch(/SP.*register containing the address/i);
     expect(mainLessonText).toContain('reserve → use → restore');
-    expect(mainLessonText).toContain('16 bytes beginning at 0xDFF0 as reserved temporary space');
+    expect(mainLessonText).toContain('marks 16 bytes as current temporary space');
     expect(mainLessonText).not.toMatch(/DFF7|DFF8|DFFF|hexadecimal continues|individual byte/i);
     expect(rangeSection?.details?.summary).toBe('Want to see exactly which 16 bytes were reserved?');
     expect(optionalText).toContain('DFF0 through DFF7');
     expect(optionalText).toContain('DFF8 through DFFF');
     expect(optionalText).toContain('Hexadecimal continues DFFD, DFFE, DFFF, E000');
     expect(optionalText).toContain('E000 − 0x10 = DFF0');
-    expect(rangeSection?.diagram).toBe('stack-growth');
-    expect(stackLesson.sections[0]?.diagram).toBeUndefined();
     expect(stackLesson.stackVisualization).toBe('simple');
     expect(stackLesson.quiz.map((question) => question.prompt).join(' ')).not.toMatch(/DFFF|exact.*range/i);
   });

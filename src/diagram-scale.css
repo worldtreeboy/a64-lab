@@ -1,0 +1,186 @@
+/*
+ * One visual scale for every static Guide diagram.
+ *
+ * Individual scenes keep their own geometry, but they share the same outer
+ * width, spacing, and type hierarchy so moving between lessons never makes a
+ * diagram suddenly feel miniature or oversized.
+ */
+
+.lesson-view {
+  --guide-diagram-max: 1080px;
+  --guide-diagram-medium-max: 900px;
+  --guide-diagram-pad: clamp(18px, 2vw, 24px);
+  --guide-diagram-heading-min: 54px;
+  --guide-diagram-eyebrow: 10px;
+  --guide-diagram-title: 15px;
+  --guide-diagram-card-title: 14px;
+  --guide-diagram-body: 12px;
+  --guide-diagram-code: 12px;
+  --guide-diagram-meta: 10px;
+  --guide-diagram-caption: 12px;
+  --guide-diagram-radius: 10px;
+}
+
+.lesson-section > :is(
+  .concept-diagram,
+  .foundation-concept-scene,
+  .control-concept-scene,
+  .advanced-concept-scene
+) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 24px 0;
+  border-radius: var(--guide-diagram-radius);
+}
+
+.lesson-section > .concept-diagram,
+.lesson-section > .control-concept-scene,
+.lesson-section > .advanced-concept-scene .acs-canvas,
+.lesson-section > .foundation-concept-scene .fcs-canvas {
+  padding: var(--guide-diagram-pad);
+}
+
+.lesson-section > .foundation-concept-scene .fcs-heading,
+.lesson-section > .advanced-concept-scene .acs-heading {
+  min-height: var(--guide-diagram-heading-min);
+  padding: 12px var(--guide-diagram-pad);
+}
+
+.lesson-section > .foundation-concept-scene .fcs-heading > span,
+.lesson-section > .foundation-concept-scene .fcs-step-label,
+.lesson-section > .control-concept-scene .ccs-eyebrow,
+.lesson-section > .control-concept-scene figcaption strong,
+.lesson-section > .advanced-concept-scene .acs-heading span {
+  font-size: var(--guide-diagram-eyebrow);
+}
+
+.lesson-section > .foundation-concept-scene .fcs-heading > strong,
+.lesson-section > .advanced-concept-scene .acs-heading > strong {
+  font-size: var(--guide-diagram-title);
+}
+
+.lesson-section > :is(
+  .concept-diagram,
+  .foundation-concept-scene,
+  .control-concept-scene,
+  .advanced-concept-scene
+) figcaption {
+  font-size: var(--guide-diagram-caption);
+  line-height: 1.6;
+}
+
+.lesson-section > .concept-diagram code,
+.lesson-section > .foundation-concept-scene code,
+.lesson-section > .control-concept-scene code,
+.lesson-section > .advanced-concept-scene code {
+  font-size: var(--guide-diagram-code);
+}
+
+/* Older specialized scenes used several unrelated 590–900px inner caps. */
+.lesson-section > .foundation-concept-scene .fcs-canvas > *,
+.lesson-section > .concept-diagram :is(
+  .register-map-scene,
+  .branch-always-scene,
+  .branch-condition-scene,
+  .pointer-scene,
+  .stack-value-scene,
+  .frame-concept-scene,
+  .endian-scene,
+  .lr-overwrite-scene,
+  .frame-pointer-scene,
+  .indexed-addressing-scene
+) {
+  width: 100%;
+  max-width: none;
+}
+
+.lesson-section > .concept-diagram :is(p, li) {
+  font-size: var(--guide-diagram-body);
+}
+
+.lesson-section > .concept-diagram small {
+  font-size: var(--guide-diagram-meta);
+}
+
+.lesson-section > .concept-diagram strong {
+  font-size: var(--guide-diagram-card-title);
+}
+
+.lesson-section > :is(
+  .foundation-concept-scene,
+  .control-concept-scene,
+  .advanced-concept-scene
+) :is(article, section) > header > strong,
+.lesson-section > .control-concept-scene .ccs-state-box > strong {
+  font-size: var(--guide-diagram-card-title);
+  line-height: 1.35;
+}
+
+.lesson-section > :is(
+  .foundation-concept-scene,
+  .control-concept-scene,
+  .advanced-concept-scene
+) :is(p, figcaption span) {
+  font-size: var(--guide-diagram-body);
+}
+
+.lesson-section > :is(
+  .foundation-concept-scene,
+  .control-concept-scene,
+  .advanced-concept-scene
+) small {
+  font-size: var(--guide-diagram-meta);
+}
+
+@media (min-width: 1181px) {
+  .lesson-section > :is(
+    .concept-diagram,
+    .foundation-concept-scene,
+    .control-concept-scene,
+    .advanced-concept-scene
+  ) {
+    position: relative;
+    left: 50%;
+    width: min(var(--guide-diagram-max), calc(100vw - 520px));
+    transform: translateX(-50%);
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .lesson-section > :is(
+    .concept-diagram,
+    .foundation-concept-scene,
+    .control-concept-scene,
+    .advanced-concept-scene
+  ) {
+    position: relative;
+    left: 50%;
+    width: min(var(--guide-diagram-medium-max), calc(100vw - 280px));
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 900px) {
+  .lesson-section > :is(
+    .concept-diagram,
+    .foundation-concept-scene,
+    .control-concept-scene,
+    .advanced-concept-scene
+  ) {
+    position: relative;
+    left: auto;
+    width: 100%;
+    transform: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .lesson-view {
+    --guide-diagram-pad: 16px;
+    --guide-diagram-card-title: 13px;
+    --guide-diagram-body: 11px;
+    --guide-diagram-code: 11px;
+    --guide-diagram-caption: 11px;
+  }
+}

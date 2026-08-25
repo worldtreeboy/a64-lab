@@ -195,10 +195,13 @@ describe('learning routes and navigation', () => {
     const { container } = renderRoutes(['/guide/stack']);
     const summary = screen.getByText('Want to see exactly which 16 bytes were reserved?');
     const details = summary.closest('details') as HTMLDetailsElement | null;
+    const diagram = screen.getByTestId('foundation-stack-growth-four-stages');
 
     expect(details).toBeTruthy();
     expect(details?.open).toBe(false);
-    expect(container.querySelector('.concept-diagram')?.textContent).not.toContain('DFFF');
+    expect(container.contains(diagram)).toBe(true);
+    expect(diagram.textContent).toContain('0xDFF8');
+    expect(diagram.textContent).not.toContain('DFFF');
     expect(screen.getByTestId('dynamic-stack').textContent).not.toMatch(/DFF8|DFFF/);
     await user.click(summary);
     expect(details?.open).toBe(true);

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import '../../foundation-concept-scenes.css';
 
 export type FoundationConceptKind =
@@ -5,6 +6,7 @@ export type FoundationConceptKind =
   | 'arithmetic-flow'
   | 'address-pointer'
   | 'memory-offset'
+  | 'stack-growth-four-stages'
   | 'stack-value-five-steps';
 
 const SCENE_META: Record<FoundationConceptKind, { title: string; caption: string }> = {
@@ -23,6 +25,10 @@ const SCENE_META: Record<FoundationConceptKind, { title: string; caption: string
   'memory-offset': {
     title: 'An offset selects a nearby byte address',
     caption: 'The CPU calculates 0x400000 + 8 = 0x400008 for the access. Ordinary offset addressing leaves X1 unchanged.',
+  },
+  'stack-growth-four-stages': {
+    title: 'Understanding the Stack (ARM64)',
+    caption: 'The stack is ordinary memory and SP is one address register. Reserve space, use it with STR and LDR, then restore SP; restoring SP does not erase the old bytes.',
   },
   'stack-value-five-steps': {
     title: 'Follow one value through five separate instructions',
@@ -220,9 +226,230 @@ function MemoryOffsetScene() {
   );
 }
 
+type StackGrowthStage = 'before' | 'reserve' | 'use' | 'restore';
+type StackValueStage = 'value-mov' | 'value-sub' | 'value-str' | 'value-ldr' | 'value-add';
+type StackTowerStage = StackGrowthStage | StackValueStage;
+
+const STACK_GROWTH_STAGES: ReadonlyArray<{ id: StackGrowthStage; label: string }> = [
+  { id: 'before', label: 'Before' },
+  { id: 'reserve', label: 'Allocate 16 bytes' },
+  { id: 'use', label: 'Use the stack' },
+  { id: 'restore', label: 'Restore' },
+];
+
+const STACK_TOWER_ROWS = [
+  { id: 'e010', address: '0xE010' },
+  { id: 'e008', address: '0xE008' },
+  { id: 'e000', address: '0xE000' },
+  { id: 'reserved-upper', address: '0xDFF8' },
+  { id: 'dff0', address: '0xDFF0' },
+] as const;
+
+function StackTower({ stage }: { stage: StackTowerStage }) {
+  const spAtOriginalAddress = ['before', 'restore', 'value-mov', 'value-add'].includes(stage);
+  const hasReservedSpace = ['reserve', 'use', 'value-sub', 'value-str', 'value-ldr'].includes(stage);
+  const hasReleasedSpace = stage === 'restore' || stage === 'value-add';
+  const hasValue = ['use', 'restore', 'value-str', 'value-ldr', 'value-add'].includes(stage);
+  const spRow = spAtOriginalAddress ? 'e000' : 'dff0';
+  const accessibleStateByStage: Record<StackTowerStage, string> = {
+    before: 'SP is at 0xE000. No temporary stack space is reserved.',
+    reserve: 'SP is at 0xDFF0. Sixteen bytes are reserved and memory is unchanged.',
+    use: 'SP is at 0xDFF0. The reserved memory contains 42.',
+    restore: 'SP is back at 0xE000. The old 42 may remain in memory, but the temporary space is finished.',
+    'value-mov': 'X0 contains 42. SP remains at 0xE000 and stack memory is unchanged.',
+    'value-sub': 'SP moved to 0xDFF0. Sixteen bytes are reserved and memory is unchanged.',
+    'value-str': 'SP is at 0xDFF0. The value 42 from X0 is stored in reserved stack memory.',
+    'value-ldr': 'SP is at 0xDFF0. Stack memory still contains 42, and X1 has loaded that value.',
+    'value-add': 'SP is back at 0xE000. The old 42 remains visible but the temporary stack space may be reused.',
+  };
+
+  return (
+    <div className={`fcs-stack-tower fcs-stack-tower-${stage}`} role="img" aria-label={accessibleStateByStage[stage]}>
+      <div className="fcs-stack-address-direction" aria-hidden="true">
+        <span>Higher addresses</span><strong>↑</strong>
+      </div>
+      <div className="fcs-stack-tower-rows" aria-hidden="true">
+        {STACK_TOWER_ROWS.map((row, index) => {
+          const temporaryRow = index >= 3;
+          const classes = [
+            'fcs-stack-tower-row',
+            hasReservedSpace && temporaryRow ? 'fcs-stack-row-reserved' : '',
+            hasReleasedSpace && temporaryRow ? 'fcs-stack-row-released' : '',
+            hasValue && row.id === 'dff0' ? 'fcs-stack-row-value' : '',
+          ].filter(Boolean).join(' ');
+          return (
+            <div className={classes} key={row.id}>
+              <code>{row.address || ' '}</code>
+              <span className="fcs-stack-memory-cell">
+                {hasValue && row.id === 'dff0' ? <strong>42</strong> : null}
+              </span>
+              <span className="fcs-stack-row-marker">
+                {row.id === spRow ? <b>← SP</b> : null}
+                {row.id === 'reserved-upper' && stage !== 'before' && stage !== 'value-mov' ? (
+                  <em>{hasReleasedSpace ? 'space finished' : '16 bytes reserved'}</em>
+                ) : null}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="fcs-stack-address-direction fcs-stack-address-direction-lower" aria-hidden="true">
+        <strong>↓</strong><span>Lower addresses</span>
+      </div>
+    </div>
+  );
+}
+
+function StackGrowthFourStagesScene() {
+  const [activeStage, setActiveStage] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!media) return undefined;
+    const updatePreference = () => {
+      setPrefersReducedMotion(media.matches);
+      if (media.matches) setIsPlaying(false);
+    };
+    updatePreference();
+    media.addEventListener?.('change', updatePreference);
+    return () => media.removeEventListener?.('change', updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    if (activeStage >= STACK_GROWTH_STAGES.length - 1) {
+      setIsPlaying(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (document.hidden) {
+        setIsPlaying(false);
+        return;
+      }
+      setActiveStage((stage) => Math.min(stage + 1, STACK_GROWTH_STAGES.length - 1));
+    }, 1900);
+    return () => window.clearTimeout(timer);
+  }, [activeStage, isPlaying]);
+
+  const chooseStage = (nextStage: number) => {
+    setIsPlaying(false);
+    setActiveStage(Math.max(0, Math.min(nextStage, STACK_GROWTH_STAGES.length - 1)));
+  };
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+    if (activeStage === STACK_GROWTH_STAGES.length - 1) setActiveStage(0);
+    setIsPlaying(true);
+  };
+
+  const restart = () => {
+    setActiveStage(0);
+    setIsPlaying(!prefersReducedMotion);
+  };
+
+  return (
+    <div
+      className={`fcs-stack-growth ${isPlaying ? 'is-playing' : 'is-paused'}`}
+      data-active-stage={activeStage + 1}
+      data-testid="foundation-stack-growth-four-stages"
+    >
+      <div className="fcs-stack-growth-intro">
+        <strong>The stack is ordinary memory.</strong>
+        <span>SP is just one register containing the address where the current temporary stack space begins.</span>
+      </div>
+
+      <div className="fcs-stack-animation-bar">
+        <div className="fcs-stack-animation-status" aria-live="polite" aria-atomic="true">
+          <span>STAGE {activeStage + 1} OF {STACK_GROWTH_STAGES.length}</span>
+          <strong>{STACK_GROWTH_STAGES[activeStage]?.label}</strong>
+        </div>
+        <div className="fcs-stack-stage-dots" aria-hidden="true">
+          {STACK_GROWTH_STAGES.map((stage, index) => (
+            <span className={index === activeStage ? 'is-current' : index < activeStage ? 'is-complete' : ''} key={stage.id} />
+          ))}
+        </div>
+        <div className="fcs-stack-animation-controls" role="group" aria-label="Stack diagram animation controls">
+          <button aria-label="Previous diagram stage" type="button" onClick={() => chooseStage(activeStage - 1)} disabled={activeStage === 0}>Previous</button>
+          <button className="fcs-stack-play-control" type="button" onClick={togglePlayback}>
+            {isPlaying ? 'Pause' : activeStage === STACK_GROWTH_STAGES.length - 1 ? 'Replay' : 'Play'}
+          </button>
+          <button aria-label="Next diagram stage" type="button" onClick={() => chooseStage(activeStage + 1)} disabled={activeStage === STACK_GROWTH_STAGES.length - 1}>Next</button>
+          <button aria-label="Restart stack animation" type="button" onClick={restart}>Restart</button>
+        </div>
+      </div>
+
+      <div className="fcs-stack-growth-panels">
+        <article
+          aria-current={activeStage === 0 ? 'step' : undefined}
+          className={`fcs-stack-growth-panel ${activeStage === 0 ? 'is-active' : activeStage > 0 ? 'is-complete' : 'is-upcoming'}`}
+        >
+          <header><span>1</span><strong>Before</strong></header>
+          <p className="fcs-stack-panel-lead">SP marks the current top.</p>
+          <StackTower stage="before" />
+          <div className="fcs-stack-panel-result"><strong>SP = 0xE000</strong></div>
+        </article>
+
+        <article
+          aria-current={activeStage === 1 ? 'step' : undefined}
+          className={`fcs-stack-growth-panel ${activeStage === 1 ? 'is-active' : activeStage > 1 ? 'is-complete' : 'is-upcoming'}`}
+        >
+          <header><span>2</span><strong>Allocate 16 bytes</strong></header>
+          <code className="fcs-stack-panel-instruction"><b>sub</b> sp, sp, #16</code>
+          <div className="fcs-stack-equation">0xE000 − 0x10 = 0xDFF0</div>
+          <StackTower stage="reserve" />
+          <div className="fcs-stack-panel-note"><strong>Only SP changed.</strong><span>Memory bytes did not change.</span></div>
+        </article>
+
+        <article
+          aria-current={activeStage === 2 ? 'step' : undefined}
+          className={`fcs-stack-growth-panel fcs-stack-growth-use ${activeStage === 2 ? 'is-active' : activeStage > 2 ? 'is-complete' : 'is-upcoming'}`}
+        >
+          <header><span>3</span><strong>Use the stack</strong></header>
+          <div className="fcs-stack-use-instructions">
+            <code><b>str</b> x0, [sp]</code>
+            <code><b>ldr</b> x1, [sp]</code>
+          </div>
+          <div className="fcs-stack-register-chip"><span>X0</span><strong>42</strong></div>
+          <div className="fcs-stack-data-arrow fcs-stack-data-arrow-store"><strong>STR</strong><span>↓</span></div>
+          <StackTower stage="use" />
+          <div className="fcs-stack-data-arrow fcs-stack-data-arrow-load"><span>↓</span><strong>LDR</strong></div>
+          <div className="fcs-stack-register-chip"><span>X1</span><strong>42</strong></div>
+          <div className="fcs-stack-panel-note"><span><b>STR</b> register → memory</span><span><b>LDR</b> memory → register</span></div>
+        </article>
+
+        <article
+          aria-current={activeStage === 3 ? 'step' : undefined}
+          className={`fcs-stack-growth-panel ${activeStage === 3 ? 'is-active' : 'is-upcoming'}`}
+        >
+          <header><span>4</span><strong>Restore</strong></header>
+          <code className="fcs-stack-panel-instruction"><b>add</b> sp, sp, #16</code>
+          <div className="fcs-stack-equation">0xDFF0 + 0x10 = 0xE000</div>
+          <StackTower stage="restore" />
+          <div className="fcs-stack-panel-note"><strong>The old 42 may remain.</strong><span>The program has finished using that temporary space.</span></div>
+        </article>
+      </div>
+
+      <div className="fcs-stack-mental-model">
+        <strong>MENTAL MODEL</strong>
+        <div><span>Stack = memory</span><p>SP = an address</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>SUB reserves</span><p>STR / LDR use that space</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>ADD restores SP</span><p>old bytes are not erased</p></div>
+      </div>
+    </div>
+  );
+}
+
 const STACK_STEPS = [
   {
     number: '1',
+    id: 'value-mov',
     opcode: 'MOV',
     instruction: 'mov x0, 42',
     changed: 'X0: 0 → 42',
@@ -230,6 +457,7 @@ const STACK_STEPS = [
   },
   {
     number: '2',
+    id: 'value-sub',
     opcode: 'SUB',
     instruction: 'sub sp, sp, #16',
     changed: 'SP: E000 → DFF0',
@@ -237,6 +465,7 @@ const STACK_STEPS = [
   },
   {
     number: '3',
+    id: 'value-str',
     opcode: 'STR',
     instruction: 'str x0, [sp]',
     changed: 'DFF0–DFF7 now hold the 8-byte value 42',
@@ -244,6 +473,7 @@ const STACK_STEPS = [
   },
   {
     number: '4',
+    id: 'value-ldr',
     opcode: 'LDR',
     instruction: 'ldr x1, [sp]',
     changed: 'X1: 0 → 42',
@@ -251,6 +481,7 @@ const STACK_STEPS = [
   },
   {
     number: '5',
+    id: 'value-add',
     opcode: 'ADD',
     instruction: 'add sp, sp, #16',
     changed: 'SP: DFF0 → E000',
@@ -259,54 +490,132 @@ const STACK_STEPS = [
 ] as const;
 
 function StackValueFiveStepsScene() {
+  const [activeStage, setActiveStage] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!media) return undefined;
+    const updatePreference = () => {
+      setPrefersReducedMotion(media.matches);
+      if (media.matches) setIsPlaying(false);
+    };
+    updatePreference();
+    media.addEventListener?.('change', updatePreference);
+    return () => media.removeEventListener?.('change', updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    if (activeStage >= STACK_STEPS.length - 1) {
+      setIsPlaying(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (document.hidden) {
+        setIsPlaying(false);
+        return;
+      }
+      setActiveStage((stage) => Math.min(stage + 1, STACK_STEPS.length - 1));
+    }, 1900);
+    return () => window.clearTimeout(timer);
+  }, [activeStage, isPlaying]);
+
+  const chooseStage = (nextStage: number) => {
+    setIsPlaying(false);
+    setActiveStage(Math.max(0, Math.min(nextStage, STACK_STEPS.length - 1)));
+  };
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+    if (activeStage === STACK_STEPS.length - 1) setActiveStage(0);
+    setIsPlaying(true);
+  };
+
+  const restart = () => {
+    setActiveStage(0);
+    setIsPlaying(!prefersReducedMotion);
+  };
+
   return (
-    <div className="fcs-stack" data-testid="foundation-stack-value-five-steps">
+    <div
+      className={`fcs-stack fcs-stack-value ${isPlaying ? 'is-playing' : 'is-paused'}`}
+      data-active-stage={activeStage + 1}
+      data-testid="foundation-stack-value-five-steps"
+    >
       <div className="fcs-stack-primer">
-        <strong>SP is an address marker.</strong>
-        <span>Changing SP changes which stack bytes the code may use. It does not move or erase those bytes. Each card below names the main non-PC effect; PC also advances.</span>
+        <strong>Watch the value 42 move.</strong>
+        <span>Each panel runs one instruction and names its main non-PC effect. The separate address, memory-cell, and marker columns keep every part of the stack easy to follow.</span>
+      </div>
+
+      <div className="fcs-stack-animation-bar fcs-stack-value-animation-bar">
+        <div className="fcs-stack-animation-status" aria-live="polite" aria-atomic="true">
+          <span>STEP {activeStage + 1} OF {STACK_STEPS.length}</span>
+          <strong>{STACK_STEPS[activeStage]?.opcode}</strong>
+        </div>
+        <div className="fcs-stack-stage-dots" aria-hidden="true">
+          {STACK_STEPS.map((step, index) => (
+            <span className={index === activeStage ? 'is-current' : index < activeStage ? 'is-complete' : ''} key={step.id} />
+          ))}
+        </div>
+        <div className="fcs-stack-animation-controls" role="group" aria-label="Stack values diagram animation controls">
+          <button aria-label="Previous diagram stage" type="button" onClick={() => chooseStage(activeStage - 1)} disabled={activeStage === 0}>Previous</button>
+          <button className="fcs-stack-play-control" type="button" onClick={togglePlayback}>
+            {isPlaying ? 'Pause' : activeStage === STACK_STEPS.length - 1 ? 'Replay' : 'Play'}
+          </button>
+          <button aria-label="Next diagram stage" type="button" onClick={() => chooseStage(activeStage + 1)} disabled={activeStage === STACK_STEPS.length - 1}>Next</button>
+          <button aria-label="Restart stack values animation" type="button" onClick={restart}>Restart</button>
+        </div>
       </div>
 
       <div className="fcs-stack-steps">
-        {STACK_STEPS.map((step) => (
-          <article className={`fcs-stack-step fcs-stack-${step.opcode.toLowerCase()}`} key={step.number}>
+        {STACK_STEPS.map((step, index) => (
+          <article
+            aria-current={activeStage === index ? 'step' : undefined}
+            className={`fcs-stack-step fcs-stack-${step.opcode.toLowerCase()} ${activeStage === index ? 'is-active' : activeStage > index ? 'is-complete' : 'is-upcoming'}`}
+            key={step.number}
+          >
             <header><span>{step.number}</span><strong>{step.opcode}</strong></header>
-            <code>{step.instruction}</code>
-            <div className="fcs-stack-change"><small>CHANGED</small><strong>{step.changed}</strong></div>
+            <code className="fcs-stack-panel-instruction"><b>{step.opcode.toLowerCase()}</b>{step.instruction.slice(step.opcode.length)}</code>
+
+            {step.id === 'value-mov' && (
+              <div className="fcs-stack-value-register-state"><span>X0</span><strong>0 → 42</strong></div>
+            )}
+            {step.id === 'value-sub' && <div className="fcs-stack-equation">0xE000 − 0x10 = 0xDFF0</div>}
+            {step.id === 'value-str' && (
+              <>
+                <div className="fcs-stack-register-chip"><span>X0</span><strong>42</strong></div>
+                <div className="fcs-stack-data-arrow"><strong>STR</strong><span>↓</span></div>
+              </>
+            )}
+
+            <StackTower stage={step.id} />
+
+            {step.id === 'value-ldr' && (
+              <>
+                <div className="fcs-stack-data-arrow fcs-stack-data-arrow-load"><span>↓</span><strong>LDR</strong></div>
+                <div className="fcs-stack-register-chip"><span>X1</span><strong>42</strong></div>
+              </>
+            )}
+            {step.id === 'value-add' && <div className="fcs-stack-equation">0xDFF0 + 0x10 = 0xE000</div>}
+
+            <div className="fcs-stack-change"><small>MAIN CHANGE</small><strong>{step.changed}</strong></div>
             <p>{step.unchanged}</p>
           </article>
         ))}
       </div>
 
-      <div className="fcs-stack-final">
-        <div className="fcs-stack-address-map">
-          <div className="fcs-address-direction"><span>higher address</span><span>lower address ↓</span></div>
-          <div className="fcs-stack-address fcs-stack-boundary">
-            <code>0x7FFFFFFFE000</code>
-            <span>current boundary after ADD</span>
-            <strong>← SP now</strong>
-          </div>
-          <div className="fcs-stack-address fcs-stack-reusable">
-            <code>0x…DFF8–DFFF</code>
-            <span>old second 8-byte range</span>
-            <em>may be reused</em>
-          </div>
-          <div className="fcs-stack-address fcs-stack-has-value">
-            <code>0x…DFF0–DFF7</code>
-            <span>old first 8-byte range</span>
-            <strong>42 remains here</strong>
-          </div>
-        </div>
-
-        <div className="fcs-stack-summary">
-          <span className="fcs-step-label">FINAL STATE</span>
-          <dl>
-            <div><dt>X0</dt><dd>42</dd></div>
-            <div><dt>X1</dt><dd>42</dd></div>
-            <div><dt>SP</dt><dd>0x…E000</dd></div>
-            <div><dt>memory at DFF0–DFF7</dt><dd>still represents 42</dd></div>
-          </dl>
-          <p><strong>“Finished with the space”</strong> means later stack work may overwrite it—not that ADD deleted it.</p>
-        </div>
+      <div className="fcs-stack-mental-model fcs-stack-value-summary">
+        <strong>FINAL STATE</strong>
+        <div><span>X0 = 42 · X1 = 42</span><p>Both registers contain the value.</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>SP = 0x7FFFFFFFE000</span><p>The short diagrams show its ending as 0xE000.</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>42 remains here</span><p>0x…DFF0–DFF7 still holds 42; 0x…DFF8–DFFF may be reused too.</p></div>
       </div>
     </div>
   );
@@ -322,6 +631,8 @@ function SceneContent({ kind }: { kind: FoundationConceptKind }) {
       return <AddressPointerScene />;
     case 'memory-offset':
       return <MemoryOffsetScene />;
+    case 'stack-growth-four-stages':
+      return <StackGrowthFourStagesScene />;
     case 'stack-value-five-steps':
       return <StackValueFiveStepsScene />;
   }
