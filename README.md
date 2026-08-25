@@ -4,7 +4,9 @@ An interactive AArch64 learning platform and visual ARM64 simulator for
 reverse engineering, low-level programming, and binary-exploitation
 fundamentals.
 
-![A64 Lab stack lesson with a visual memory diagram](docs/a64-guide.png)
+![A64 Lab Cyberpunk HUD showing the animated Stack and SP lesson](docs/a64-guide.png)
+
+*Cyberpunk HUD is the default theme. Shown here: the animated Stack and SP lesson.*
 
 A64 Lab combines a structured beginner course, prediction exercises, small
 coding challenges, and a debugger-style simulator. You can learn one concept,
@@ -96,7 +98,9 @@ time with Previous and Next. Address labels, memory cells, and SP annotations
 use separate columns so the layout remains readable from a wide desktop down
 to a 320 px viewport.
 
-![A64 Lab debugger with live register, data-flow, and stack visualization](docs/a64-lab.png)
+![A64 Lab Cyberpunk HUD debugger with live register, data-flow, and stack visualization](docs/a64-lab.png)
+
+*The full Lab in Cyberpunk HUD, with live register, data-flow, memory, and stack views.*
 
 ## Themes and motion
 
