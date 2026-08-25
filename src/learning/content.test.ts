@@ -6,6 +6,7 @@ import { DATA_BASE } from '../arm64/parser';
 import { CHALLENGE_CATEGORIES, CHALLENGES, getChallenge } from './challenges';
 import { CURRICULUM_STAGES, lessonsForStage } from './curriculum';
 import { getAdjacentLessons, getLesson, LESSONS } from './lessons';
+import type { Lesson } from './types';
 
 const EXPECTED_LESSON_IDS = [
   'meet-arm64',
@@ -330,6 +331,69 @@ describe('lesson content', () => {
     }
   });
 
+  it('executes every assembly listing from lessons 12 through 36', () => {
+    for (const lesson of LESSONS.slice(11)) {
+      for (const section of lesson.sections) {
+        if (!section.code) continue;
+        expect(
+          () => runProgram(section.code!),
+          `${lesson.id}/${section.id} listing should execute to completion`,
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it('introduces advanced terms before the section that first shows their syntax', () => {
+    const contracts: Array<{
+      lessonId: string;
+      concept: string;
+      definitionSectionId: string;
+      syntax: RegExp;
+    }> = [
+      { lessonId: 'loading-addresses', concept: 'data label', definitionSectionId: 'label-is-a-location-name', syntax: /^\s*message:/m },
+      { lessonId: 'loading-addresses', concept: 'equals-label pseudo-load', definitionSectionId: 'pseudo-load-copies-the-address', syntax: /ldr x1,\s*=message/i },
+      { lessonId: 'syscall-gate', concept: 'X8 syscall number', definitionSectionId: 'x8-selects-the-service', syntax: /mov x8,\s*93/i },
+      { lessonId: 'syscall-gate', concept: 'SVC gate', definitionSectionId: 'svc-crosses-the-boundary', syntax: /svc\s+(?:#)?0/i },
+      { lessonId: 'linux-syscalls', concept: 'write syscall', definitionSectionId: 'write-copies-a-memory-range', syntax: /mov x8,\s*64|svc\s+(?:#)?0/i },
+      { lessonId: 'reading-disassembly', concept: 'disassembly', definitionSectionId: 'disassembly-comes-from-machine-bytes', syntax: /stp x29/i },
+      { lessonId: 'c-to-arm64', concept: 'source mapping', definitionSectionId: 'source-code-describes-behavior', syntax: /add w0/i },
+      { lessonId: 'debugging-state', concept: 'recognizable byte pattern', definitionSectionId: 'debug-example-is-constructed', syntax: /0x4141414141414141/i },
+      { lessonId: 'indirect-control-flow', concept: 'register target', definitionSectionId: 'code-pointer-selects-an-instruction', syntax: /\b(?:br|blr)\b/i },
+      { lessonId: 'native-code-patterns', concept: 'native-code workflow', definitionSectionId: 'native-reading-needs-a-repeatable-order', syntax: /bl transform/i },
+    ];
+    const executableText = (section: Lesson['sections'][number]) => (
+      `${section.code ?? ''}\n${section.walkthrough?.execute ?? ''}`
+    );
+
+    for (const contract of contracts) {
+      const lesson = getLesson(contract.lessonId)!;
+      const definitionIndex = lesson.sections.findIndex((section) => section.id === contract.definitionSectionId);
+      const syntaxIndex = lesson.sections.findIndex((section) => contract.syntax.test(executableText(section)));
+      expect(definitionIndex, `${contract.concept} definition missing`).toBeGreaterThanOrEqual(0);
+      expect(syntaxIndex, `${contract.concept} syntax missing`).toBeGreaterThanOrEqual(0);
+      expect(definitionIndex, `${contract.concept} must be explained before syntax`).toBeLessThanOrEqual(syntaxIndex);
+    }
+  });
+
+  it('classifies RET as indirect control flow without claiming that input controls it', () => {
+    const taught = (lesson: Lesson) => [
+      lesson.coreIdea,
+      ...lesson.sections.flatMap((section) => [
+        section.title,
+        ...section.paragraphs,
+        ...(section.bullets ?? []),
+        section.callout ?? '',
+      ]),
+    ].join(' ');
+    const indirect = taught(getLesson('indirect-control-flow')!);
+    const native = taught(getLesson('native-code-patterns')!);
+
+    expect(indirect).toMatch(/RET.*(?:indirect|register-targeted).*X30|(?:indirect|register-targeted).*RET.*X30/i);
+    expect(native).not.toMatch(/no indirect branch/i);
+    expect(native).toMatch(/RET.*indirect return.*X30/i);
+    expect(native).toMatch(/no evidence.*input.*(?:X30|return address|indirect target)/i);
+  });
+
   it('runs every Try in Lab program to completion on the real CPU', () => {
     for (const lesson of LESSONS) {
       expect(lesson.labProgram, `${lesson.id} should have a lab program`).toBeTruthy();
@@ -371,9 +435,91 @@ describe('lesson content', () => {
     const compareProgram = parseProgram(getLesson('cmp-nzcv')!.labProgram!);
     expect(compareProgram.instructions.map((instruction) => instruction.opcode)).toContain('tst');
     const comparison = runProgram(getLesson('cmp-nzcv')!.labProgram!);
-    expect(comparison.registers.x0).toBe(0x10n);
-    expect(comparison.registers.x1).toBe(0x0fn);
+    expect(comparison.registers.x0).toBe(0x0an);
+    expect(comparison.registers.x1).toBe(0x04n);
     expect(comparison.flags).toEqual({ N: false, Z: true, C: false, V: false });
+  });
+
+  it('defines CMP and TST separately before their first executable use', () => {
+    const lesson = getLesson('cmp-nzcv')!;
+    const text = (section: Lesson['sections'][number]) => [
+      section.title,
+      ...section.paragraphs,
+      ...(section.bullets ?? []),
+      section.callout ?? '',
+    ].join(' ');
+    const firstUse = (opcode: 'cmp' | 'tst') => lesson.sections.findIndex((section) => (
+      new RegExp(`(?:^|\\n)\\s*${opcode}\\b`, 'i').test(section.code ?? '')
+        || new RegExp(`^${opcode}\\b`, 'i').test(section.walkthrough?.execute ?? '')
+    ));
+    const cmpDefinition = lesson.sections.findIndex((section) => /CMP means Compare/i.test(text(section)));
+    const tstDefinition = lesson.sections.findIndex((section) => /TST means Test Bits/i.test(text(section)));
+
+    expect(cmpDefinition).toBeGreaterThanOrEqual(0);
+    expect(tstDefinition).toBeGreaterThanOrEqual(0);
+    expect(cmpDefinition).not.toBe(tstDefinition);
+    expect(cmpDefinition).toBeLessThanOrEqual(firstUse('cmp'));
+    expect(tstDefinition).toBeLessThanOrEqual(firstUse('tst'));
+
+    const cmpText = text(lesson.sections[cmpDefinition]!);
+    expect(cmpText).toMatch(/subtract/i);
+    expect(cmpText).toMatch(/throws .* away|discard|does not store/i);
+    expect(cmpText).toMatch(/input registers.*stay the same|X0 and X1 stay the same/i);
+
+    const tstText = text(lesson.sections[tstDefinition]!);
+    expect(tstText).toMatch(/bitwise AND/i);
+    expect(tstText).toMatch(/overlap|same position/i);
+    expect(tstText).toMatch(/discards|throws .* away|does not save/i);
+    expect(tstText).toMatch(/input registers stay unchanged/i);
+
+    const taught = lesson.sections.map(text).join(' ');
+    expect(taught).toMatch(/Z is the Zero flag/i);
+    expect(taught).toMatch(/zero[^.]*Z\s*=\s*1/i);
+    expect(taught).toMatch(/non-zero[^.]*Z\s*=\s*0/i);
+  });
+
+  it('runs both CMP and TST outcomes without changing their operands', () => {
+    const cpu = new ARM64CPU();
+    cpu.loadProgram(getLesson('cmp-nzcv')!.labProgram!);
+    const observations: Array<{
+      opcode: string;
+      before: [bigint, bigint];
+      after: [bigint, bigint];
+      Z: boolean;
+    }> = [];
+
+    while (!cpu.halted) {
+      const opcode = cpu.currentInstruction?.opcode;
+      const before: [bigint, bigint] = [cpu.registers.x0, cpu.registers.x1];
+      cpu.step();
+      if (opcode === 'cmp' || opcode === 'tst') {
+        observations.push({
+          opcode,
+          before,
+          after: [cpu.registers.x0, cpu.registers.x1],
+          Z: cpu.flags.Z,
+        });
+      }
+    }
+
+    expect(observations).toEqual([
+      { opcode: 'cmp', before: [5n, 5n], after: [5n, 5n], Z: true },
+      { opcode: 'cmp', before: [5n, 7n], after: [5n, 7n], Z: false },
+      { opcode: 'tst', before: [0x0an, 0x02n], after: [0x0an, 0x02n], Z: false },
+      { opcode: 'tst', before: [0x0an, 0x04n], after: [0x0an, 0x04n], Z: true },
+    ]);
+  });
+
+  it('demonstrates why signed less-than reads N together with V', () => {
+    const overflowExample = getLesson('signed-flags')!.sections
+      .find((section) => section.id === 'overflow-can-mislead-n');
+    expect(overflowExample?.code).toBeTruthy();
+
+    const cpu = runProgram(overflowExample!.code!);
+    expect(cpu.registers.x0).toBe(0x80000000n);
+    expect(cpu.registers.x1).toBe(1n);
+    expect(cpu.flags).toEqual({ N: false, Z: false, C: true, V: true });
+    expect(cpu.flags.N).not.toBe(cpu.flags.V);
   });
 
   it('keeps the debugger snapshot program and final integration visual focus exact', () => {

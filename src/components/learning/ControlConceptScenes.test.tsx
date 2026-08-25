@@ -7,7 +7,7 @@ import { ControlConceptScene, type ControlConceptSceneKind } from './ControlConc
 afterEach(cleanup);
 
 const SCENES: Array<{ kind: ControlConceptSceneKind; label: RegExp }> = [
-  { kind: 'cmp-zero', label: /CMP equality and zero flag comparison/i },
+  { kind: 'cmp-zero', label: /CMP comparison, TST bit test, and Zero flag outcomes/i },
   { kind: 'signed-flags', label: /Signed and unsigned comparison flag meanings/i },
   { kind: 'ordered-branch', label: /Signed less-than branch decision/i },
   { kind: 'bl-only', label: /BL function call and link register effects/i },
@@ -29,14 +29,22 @@ describe('ControlConceptScene', () => {
     expect(figure.querySelector('figcaption')?.textContent?.length).toBeGreaterThan(40);
   });
 
-  it('contrasts equal and unequal CMP outcomes without changing operands', () => {
+  it('defines CMP, TST, and Z before contrasting all four zero outcomes', () => {
     render(<ControlConceptScene kind="cmp-zero" />);
     const figure = screen.getByRole('figure');
+    expect(figure.textContent).toContain('CMP · Compare');
+    expect(figure.textContent).toContain('TST · Test Bits');
+    expect(figure.textContent).toContain('Z · Zero flag');
     expect(figure.textContent).toContain('5 − 5 = 0');
     expect(figure.textContent).toContain('5 − 7 ≠ 0');
-    expect(figure.textContent).toContain('Z1equal');
-    expect(figure.textContent).toContain('Z0not equal');
-    expect(within(figure).getAllByText('X0 and X1 stay unchanged')).toHaveLength(2);
+    expect(figure.textContent).toContain('1010');
+    expect(figure.textContent).toContain('0010 is non-zero');
+    expect(figure.textContent).toContain('0000 is zero');
+    expect(figure.textContent).toContain('selected bit found');
+    expect(figure.textContent).toContain('selected bit not found');
+    expect(within(figure).getAllByText('X0 and X1 stay unchanged')).toHaveLength(4);
+    expect(figure.querySelectorAll('.ccs-concept-lane')).toHaveLength(2);
+    expect(figure.querySelectorAll('.ccs-compare-case')).toHaveLength(4);
   });
 
   it('explains every signed-comparison flag from one fixed-width result', () => {
@@ -52,6 +60,8 @@ describe('ControlConceptScene', () => {
     expect(scene.textContent).toContain('C = 0unsigned borrow needed');
     expect(scene.textContent).toContain('V = 0signed answer fits');
     expect(scene.textContent).toContain('UnchangedX0 = 5X1 = 7');
+    expect(scene.textContent).toContain('0x80000000 − 1 → 0x7FFFFFFF');
+    expect(scene.textContent).toContain('N = 0V = 1N ≠ V → signed less-than is true');
   });
 
   it('shows the exact signed B.LT recipe and dims fallthrough', () => {

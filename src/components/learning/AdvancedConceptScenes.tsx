@@ -165,13 +165,13 @@ function LabelAddressScene() {
           <span>1 · COPY THE ADDRESS</span>
           <code>ldr x1, =message</code>
           <div><strong>X1</strong><code>0x00400000</code></div>
-          <p>X1 now points to message. Memory was not read.</p>
+          <p>X1 now points to message. The bytes stored at message were not read.</p>
         </article>
         <article className="acs-operation-card acs-address-read">
           <span>2 · FOLLOW THE POINTER</span>
-          <code>ldr x2, [x1]</code>
-          <div><strong>X2</strong><code>first 8 bytes at X1</code></div>
-          <p>The brackets mean: use X1 as a memory address and read there.</p>
+          <code>ldrb w2, [x1]</code>
+          <div><strong>W2 / X2</strong><code>0x68 · first byte at X1</code></div>
+          <p>The brackets use X1 as an address. LDRB reads one byte there.</p>
         </article>
       </div>
       <svg className="acs-pointer-line" viewBox="0 0 420 90" preserveAspectRatio="none" aria-hidden="true">
@@ -218,8 +218,8 @@ function WriteBytesScene() {
     <SceneFrame
       kind="write-bytes"
       eyebrow="LINUX AARCH64 WRITE"
-      title="Destination + start address + exact byte count"
-      caption="write reads exactly X2 bytes beginning at X1. The NUL byte remains in memory because X2 is 6, not 7."
+      title="Destination + start address + requested byte count"
+      caption="X2 requests up to six bytes. A64 Lab models a successful write of all six, so the NUL byte remains outside the selected range."
     >
       <div className="acs-write-registers">
         <div><code>X0 = 1</code><span>stdout descriptor</span></div>
@@ -232,7 +232,7 @@ function WriteBytesScene() {
         <ByteStrip cells={HELLO_BYTES} label="six selected message bytes followed by one excluded zero byte" />
         <div className="acs-byte-bracket"><span>these six bytes are sent</span><em>00 is outside the count</em></div>
       </div>
-      <div className="acs-write-route" aria-hidden="true"><span>SVC 0</span><strong>↓ exactly 6 bytes</strong></div>
+      <div className="acs-write-route" aria-hidden="true"><span>SVC 0</span><strong>↓ A64 Lab: 6 bytes</strong></div>
       <div className="acs-mini-terminal">
         <header><i /><i /><i /><span>stdout</span></header>
         <pre>hello↵</pre>
@@ -247,7 +247,7 @@ function DisassemblyAnatomyScene() {
       kind="disassembly-anatomy"
       eyebrow="FROM BYTES BACK TO INSTRUCTIONS"
       title="Disassembly is a readable view of machine code"
-      caption="A disassembler recovers instruction boundaries, mnemonics, and operands. It cannot reliably restore the original variable names, comments, types, or exact source."
+      caption="Given code addresses and the correct alignment, a disassembler decodes bytes into instruction boundaries, mnemonics, and operands. It cannot reliably restore original names, comments, types, or exact source."
     >
       <div className="acs-disassembly-pipeline">
         <div><span>1</span><strong>Assembly source</strong><code>stp x29, x30, [sp, #-32]!</code></div>

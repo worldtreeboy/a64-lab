@@ -375,6 +375,22 @@ describe('focused live lesson visualizations', () => {
     expect(within(flags).queryByText('V')).toBeNull();
   });
 
+  it('defines CMP, TST, and Z in the beginner guide before detailed syntax', () => {
+    renderRoutes(['/guide/cmp-nzcv']);
+
+    const guide = screen.getByRole('region', { name: 'How CMP and TST Answer Questions' });
+    expect(within(guide).getByRole('heading', { name: 'Why this matters' })).toBeTruthy();
+    expect(within(guide).getByText('CMP — Compare')).toBeTruthy();
+    expect(within(guide).getByText('TST — Test bits')).toBeTruthy();
+    expect(within(guide).getByText('Z — Zero flag')).toBeTruthy();
+    expect(within(guide).getByText('cmp x0, x1')).toBeTruthy();
+    expect(within(guide).getByText('tst x0, x1')).toBeTruthy();
+
+    const firstDetailedHeading = screen.getByRole('heading', { name: 'Why does the CPU need CMP and TST?' });
+    expect(guide.compareDocumentPosition(firstDetailedHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('figure', { name: /CMP comparison, TST bit test, and Zero flag outcomes/i })).toBeTruthy();
+  });
+
   it('keeps the first BL lesson scoped to PC, LR, and the call path', async () => {
     const user = userEvent.setup();
     renderRoutes(['/guide/function-calls']);

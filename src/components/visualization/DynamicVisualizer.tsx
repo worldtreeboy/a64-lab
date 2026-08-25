@@ -77,6 +77,13 @@ interface SimpleStackView {
   message: string;
 }
 
+interface ComparisonExplanation {
+  operation: string;
+  formula: string;
+  zeroResult: string;
+  unchanged: string;
+}
+
 const FLAG_NAMES: FlagName[] = ['N', 'Z', 'C', 'V'];
 
 const SIMPLE_STACK_STAGES = [
@@ -305,6 +312,39 @@ function valueLabel(operand: Operand | undefined, registers: RegisterState): str
   if (value === null) return operandLabel(operand);
   const bits = operand?.kind === 'register' && operand.name.startsWith('w') ? 32 : 64;
   return formatHex(value, bits);
+}
+
+function buildComparisonExplanation(
+  instruction: ParsedInstruction,
+  input: CPUSnapshot,
+  output: CPUSnapshot,
+): ComparisonExplanation | null {
+  if (instruction.opcode !== 'cmp' && instruction.opcode !== 'tst') return null;
+  const leftOperand = instruction.operands[0];
+  const rightOperand = instruction.operands[1];
+  if (leftOperand?.kind !== 'register' || !rightOperand) return null;
+  const left = operandValue(leftOperand, input.registers);
+  const right = operandValue(rightOperand, input.registers);
+  if (left === null || right === null) return null;
+
+  const bits = leftOperand.name.startsWith('w') ? 32 : 64;
+  const widthMask = (1n << BigInt(bits)) - 1n;
+  const result = instruction.opcode === 'cmp'
+    ? (left - right) & widthMask
+    : (left & right) & widthMask;
+  const operator = instruction.opcode === 'cmp' ? '−' : 'AND';
+  const leftLabel = operandLabel(leftOperand);
+  const rightLabel = operandLabel(rightOperand);
+  const isZero = result === 0n;
+
+  return {
+    operation: instruction.opcode === 'cmp'
+      ? 'CMP means Compare · temporary subtraction'
+      : 'TST means Test Bits · temporary bitwise AND',
+    formula: `${formatHex(left, bits)} ${operator} ${formatHex(right, bits)} = ${formatHex(result, bits)}`,
+    zeroResult: `${isZero ? 'Zero' : 'Non-zero'} temporary answer → Z = ${output.flags.Z ? '1' : '0'}`,
+    unchanged: `${leftLabel}${rightOperand.kind === 'register' ? ` and ${rightLabel}` : ''} ${rightOperand.kind === 'register' ? 'stay' : 'stays'} unchanged`,
+  };
 }
 
 function effectiveAddress(memoryOperand: MemoryOperand, registers: RegisterState): bigint {
@@ -606,8 +646,11 @@ export function DynamicVisualizer({
   const showCalls = isCallInstruction || isReturnInstruction || callStackChanged;
   const showInitialCalls = direction === 'reset' && (focus?.includes('calls') ?? false);
   const isConditionalBranch = hasAdjacentInstructionStates && (instruction?.opcode.startsWith('b.') ?? false);
-  const isComparison = hasAdjacentInstructionStates
+  const isComparison = direction === 'forward'
     && (instruction?.opcode === 'cmp' || instruction?.opcode === 'tst');
+  const comparisonExplanation = isComparison && instruction
+    ? buildComparisonExplanation(instruction, executionInput, executionOutput)
+    : null;
   const observedBranchOutput = direction === 'back' ? before : after;
   const branchTaken = (direction === 'back' ? before.lastBranchTaken : after.lastBranchTaken) ?? false;
   const animationKey = [
@@ -923,10 +966,20 @@ export function DynamicVisualizer({
         <section className="dv-card dv-control-flow" aria-label="Flags and branch visualization" data-testid="dynamic-branch">
           <h3>{isConditionalBranch ? 'Branch decision' : 'Flags'}</h3>
           {isComparison && instruction && (
-            <div className="dv-comparison">
-              <div><span>{operandLabel(instruction.operands[0])}</span><code>{valueLabel(instruction.operands[0], executionInput.registers)}</code></div>
-              <strong>{instruction.opcode.toUpperCase()}</strong>
-              <div><span>{operandLabel(instruction.operands[1])}</span><code>{valueLabel(instruction.operands[1], executionInput.registers)}</code></div>
+            <div className="dv-comparison-block">
+              <div className="dv-comparison">
+                <div><span>{operandLabel(instruction.operands[0])}</span><code>{valueLabel(instruction.operands[0], executionInput.registers)}</code></div>
+                <strong>{instruction.opcode.toUpperCase()}</strong>
+                <div><span>{operandLabel(instruction.operands[1])}</span><code>{valueLabel(instruction.operands[1], executionInput.registers)}</code></div>
+              </div>
+              {comparisonExplanation && (
+                <div className="dv-comparison-explanation">
+                  <strong>{comparisonExplanation.operation}</strong>
+                  <code>{comparisonExplanation.formula}</code>
+                  <span>{comparisonExplanation.zeroResult}</span>
+                  <small>{comparisonExplanation.unchanged}</small>
+                </div>
+              )}
             </div>
           )}
           <div className="dv-flags" aria-label={`Condition flags: ${flagSummary(after.flags, visibleFlags)}`}>

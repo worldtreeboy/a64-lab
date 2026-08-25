@@ -1099,7 +1099,13 @@
 
   .acs-syscall-boundary .acs-canvas {
     grid-template-columns: 1fr;
-    padding-bottom: 58px;
+    padding-bottom: 16px;
+  }
+
+  .acs-syscall-boundary .acs-simulation-badge {
+    position: static;
+    grid-column: 1;
+    justify-self: stretch;
   }
 
   .acs-svc-gate {

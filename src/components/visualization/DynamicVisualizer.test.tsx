@@ -88,6 +88,36 @@ mov x1, 1`);
     expect(within(screen.getByTestId('dynamic-branch')).getByText('✕ NOT TAKEN')).toBeTruthy();
   });
 
+  it('explains the temporary CMP and TST calculations that produce Z', () => {
+    const compare = new ARM64CPU();
+    compare.loadProgram(`mov x0, 5
+mov x1, 5
+cmp x0, x1`);
+    compare.step();
+    compare.step();
+
+    const view = render(<DynamicVisualizer transition={stepTransition(compare)} focus={['flags']} flagFocus={['Z']} />);
+    let flags = screen.getByTestId('dynamic-branch');
+    expect(within(flags).getByText('CMP means Compare · temporary subtraction')).toBeTruthy();
+    expect(flags.textContent).toContain('0x0000000000000005 − 0x0000000000000005 = 0x0000000000000000');
+    expect(flags.textContent).toContain('Zero temporary answer → Z = 1');
+    expect(flags.textContent).toContain('X0 and X1 stay unchanged');
+
+    const testBits = new ARM64CPU();
+    testBits.loadProgram(`mov x0, 0x0a
+mov x1, 0x02
+tst x0, x1`);
+    testBits.step();
+    testBits.step();
+    view.rerender(<DynamicVisualizer transition={stepTransition(testBits)} focus={['flags']} flagFocus={['Z']} />);
+
+    flags = screen.getByTestId('dynamic-branch');
+    expect(within(flags).getByText('TST means Test Bits · temporary bitwise AND')).toBeTruthy();
+    expect(flags.textContent).toContain('0x000000000000000A AND 0x0000000000000002 = 0x0000000000000002');
+    expect(flags.textContent).toContain('Non-zero temporary answer → Z = 0');
+    expect(flags.textContent).toContain('X0 and X1 stay unchanged');
+  });
+
   it('visualizes BL saving LR, entering a frame, and RET removing it', () => {
     const cpu = new ARM64CPU();
     cpu.loadProgram(`_start:

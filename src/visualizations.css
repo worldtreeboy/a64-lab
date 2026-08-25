@@ -746,6 +746,49 @@
   margin-bottom: 9px;
 }
 
+.dv-comparison-block {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.dv-comparison-block .dv-comparison {
+  margin-bottom: 0;
+}
+
+.dv-comparison-explanation {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--cyan, #4bd5e7) 28%, var(--line, #202a38));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cyan, #4bd5e7) 6%, var(--surface, #0e131c));
+  text-align: center;
+}
+
+.dv-comparison-explanation strong {
+  color: var(--cyan, #4bd5e7);
+  font-size: 11px;
+}
+
+.dv-comparison-explanation code {
+  overflow-wrap: anywhere;
+  color: var(--text, #e7eef8);
+  font-size: 10px;
+}
+
+.dv-comparison-explanation span,
+.dv-comparison-explanation small {
+  color: var(--muted, #7f8da3);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.dv-comparison-explanation span {
+  color: var(--green, #57dfa0);
+  font-weight: 700;
+}
+
 .dv-comparison > div {
   display: grid;
   gap: 2px;

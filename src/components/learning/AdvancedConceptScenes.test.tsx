@@ -60,9 +60,10 @@ describe('advanced learning concept scenes', () => {
 
     expect(container.textContent).toContain('message0x00400000');
     expect(container.textContent).toContain('ldr x1, =message');
-    expect(container.textContent).toContain('Memory was not read');
-    expect(container.textContent).toContain('ldr x2, [x1]');
-    expect(container.textContent).toContain('use X1 as a memory address');
+    expect(container.textContent).toContain('The bytes stored at message were not read');
+    expect(container.textContent).toContain('ldrb w2, [x1]');
+    expect(container.textContent).toContain('LDRB reads one byte there');
+    expect(container.textContent).toContain('0x68 · first byte at X1');
   });
 
   it('labels the syscall boundary as a simulation', () => {

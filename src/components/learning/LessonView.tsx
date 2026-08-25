@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getBeginnerGuide } from '../../learning/beginnerGuides';
 import { getAdjacentLessons } from '../../learning/lessons';
 import { formatLearnerText } from '../../learning/learnerText';
 import { useProgress } from '../../learning/progress';
 import type { Lesson } from '../../learning/types';
 import { AssemblyExample, TryInLabButton } from './AssemblyExample';
+import { BeginnerGuide } from './BeginnerGuide';
 import { ConceptDiagram } from './ConceptDiagram';
 import { LiveLessonDemo } from './LiveLessonDemo';
 import { PredictionQuestion } from './PredictionQuestion';
@@ -34,6 +36,7 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
   const canToggleCompletion = complete || allQuestionsCorrect;
   const completionRequirementId = `completion-requirement-${lesson.id}`;
   const { previous, next } = getAdjacentLessons(lesson.id);
+  const beginnerGuide = getBeginnerGuide(lesson.id);
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -56,6 +59,8 @@ export function LessonView({ lesson }: { lesson: Lesson }) {
         </div>
         <span className="lesson-duration">{lesson.estimatedMinutes} min</span>
       </header>
+
+      {beginnerGuide && <BeginnerGuide guide={beginnerGuide} />}
 
       <section className={`lesson-mental-model lesson-mental-model-${lesson.kind}`} aria-labelledby={`core-idea-${lesson.id}`}>
         <span className="eyebrow">

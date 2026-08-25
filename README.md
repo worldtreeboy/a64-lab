@@ -47,6 +47,12 @@ try the program in the full Lab
 check the idea and mark the lesson complete
 ```
 
+Lessons 12–36 also begin with a **Start Here** guide. It explains why the
+concept exists, defines every new mnemonic or term in plain language, walks
+through the idea in execution order, and ends with one short rule to remember.
+For example, the comparison lesson separately defines CMP (Compare), TST (Test
+Bits), and Z (Zero flag) before showing their assembly syntax and live state.
+
 The 36-lesson path deliberately separates concepts that are often taught all
 at once:
 
@@ -177,8 +183,11 @@ _start:
 
 The terminal displays `shellcode`, then reports exit status `0`.
 
-> `write` reads exactly X2 bytes. It does not stop at the NULL byte added by
-> `.asciz`. If you change the text, update X2 to its UTF-8 byte length.
+> X2 is the maximum byte count requested from `write`; the call does not stop
+> at the NUL byte added by `.asciz`. A real call can write fewer bytes and
+> reports the actual count (or an error) in X0. This simulator models the
+> simple success case, so if you change the text, update X2 to its UTF-8 byte
+> length.
 
 ## Supported educational subset
 

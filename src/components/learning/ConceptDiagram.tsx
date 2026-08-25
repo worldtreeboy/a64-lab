@@ -172,7 +172,7 @@ const DIAGRAMS: Partial<Record<DiagramKind, { label: string; nodes: string[]; no
   'data-bytes': {
     label: 'String in data memory',
     nodes: ['"ARM64\\n"', '41 52 4D 36 34 0A', '00'],
-    note: '.asciz appends the final NULL byte; .ascii does not.',
+    note: '.asciz appends the final NUL byte; .ascii does not.',
   },
   'code-sections': {
     label: 'Code and data occupy separate sections',
@@ -383,7 +383,7 @@ function FramePointerDiagram() {
   return (
     <div className="frame-pointer-scene" aria-hidden="true">
       <div className="frame-pointer-phase">
-        <span>Before</span>
+        <span>After the first SUB · before MOV</span>
         <code>SP → 0x…DFE0</code>
         <strong>X29 has its older value</strong>
       </div>

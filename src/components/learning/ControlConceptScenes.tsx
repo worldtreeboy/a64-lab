@@ -19,8 +19,8 @@ interface ControlConceptSceneProps {
 
 const SCENE_DETAILS: Record<ControlConceptSceneKind, { label: string; caption: string }> = {
   'cmp-zero': {
-    label: 'CMP equality and zero flag comparison',
-    caption: 'CMP keeps the operands and updates the flags. Z is 1 exactly when the compared values are equal.',
+    label: 'CMP comparison, TST bit test, and Zero flag outcomes',
+    caption: 'CMP means Compare and temporarily subtracts. TST means Test Bits and temporarily ANDs. Neither changes its inputs; Z is 1 when the temporary answer is zero.',
   },
   'signed-flags': {
     label: 'Signed and unsigned comparison flag meanings',
@@ -101,6 +101,12 @@ function SignedFlagsScene() {
         ))}
       </div>
       <div className="ccs-unchanged-strip"><strong>Unchanged</strong><code>X0 = 5</code><code>X1 = 7</code></div>
+      <div className="ccs-overflow-example">
+        <span>WHY N MUST BE READ WITH V</span>
+        <code>32-bit: 0x80000000 − 1 → 0x7FFFFFFF</code>
+        <div><strong>N = 0</strong><strong>V = 1</strong><em>N ≠ V → signed less-than is true</em></div>
+        <small>The mathematical answer is below the signed 32-bit range, so V warns that the apparent positive result wrapped.</small>
+      </div>
     </div>
   );
 }
@@ -129,26 +135,71 @@ function StateBox({
 
 function CmpZeroScene() {
   return (
-    <div className="ccs-compare-grid">
-      <section className="ccs-compare-case ccs-case-equal">
-        <header><span>CASE 1</span><strong>Equal values</strong></header>
-        <div className="ccs-register-pair">
-          <code>X0 = 5</code><span>versus</span><code>X1 = 5</code>
+    <div className="ccs-compare-scene">
+      <div className="ccs-definition-strip ccs-compare-definitions">
+        <span><strong>CMP · Compare</strong><small>temporarily subtract the second value from the first</small></span>
+        <span><strong>TST · Test Bits</strong><small>temporarily AND two bit patterns to find shared 1 bits</small></span>
+        <span><strong>Z · Zero flag</strong><small>zero answer → Z = 1 · non-zero answer → Z = 0</small></span>
+      </div>
+
+      <section className="ccs-concept-lane" aria-label="CMP whole-value comparison examples">
+        <header>
+          <span>CMP · WHOLE VALUES</span>
+          <strong>Are the two values equal?</strong>
+        </header>
+        <div className="ccs-compare-grid">
+          <article className="ccs-compare-case ccs-case-equal">
+            <header><span>EQUAL</span><strong>Same values</strong></header>
+            <div className="ccs-register-pair">
+              <code>X0 = 5</code><span>versus</span><code>X1 = 5</code>
+            </div>
+            <code className="ccs-instruction">cmp x0, x1</code>
+            <div className="ccs-equation">5 − 5 = 0</div>
+            <div className="ccs-flag-result"><span>Z</span><strong>1</strong><em>zero → equal</em></div>
+            <small>X0 and X1 stay unchanged</small>
+          </article>
+          <article className="ccs-compare-case ccs-case-unequal">
+            <header><span>DIFFERENT</span><strong>Different values</strong></header>
+            <div className="ccs-register-pair">
+              <code>X0 = 5</code><span>versus</span><code>X1 = 7</code>
+            </div>
+            <code className="ccs-instruction">cmp x0, x1</code>
+            <div className="ccs-equation">5 − 7 ≠ 0</div>
+            <div className="ccs-flag-result"><span>Z</span><strong>0</strong><em>non-zero → different</em></div>
+            <small>X0 and X1 stay unchanged</small>
+          </article>
         </div>
-        <code className="ccs-instruction">cmp x0, x1</code>
-        <div className="ccs-equation">5 − 5 = 0</div>
-        <div className="ccs-flag-result"><span>Z</span><strong>1</strong><em>equal</em></div>
-        <small>X0 and X1 stay unchanged</small>
       </section>
-      <section className="ccs-compare-case ccs-case-unequal">
-        <header><span>CASE 2</span><strong>Different values</strong></header>
-        <div className="ccs-register-pair">
-          <code>X0 = 5</code><span>versus</span><code>X1 = 7</code>
+
+      <section className="ccs-concept-lane" aria-label="TST selected-bit examples">
+        <header>
+          <span>TST · SELECTED BITS</span>
+          <strong>Is the selected 1 bit present?</strong>
+        </header>
+        <div className="ccs-compare-grid ccs-test-grid">
+          <article className="ccs-compare-case ccs-test-case ccs-case-unequal">
+            <header><span>BIT PRESENT</span><strong>Patterns overlap</strong></header>
+            <div className="ccs-bit-operation">
+              <code>value&nbsp; 1010</code>
+              <code>mask&nbsp;&nbsp; 0010</code>
+              <code>AND&nbsp;&nbsp;&nbsp; 0010</code>
+            </div>
+            <div className="ccs-equation">0010 is non-zero</div>
+            <div className="ccs-flag-result"><span>Z</span><strong>0</strong><em>selected bit found</em></div>
+            <small>X0 and X1 stay unchanged</small>
+          </article>
+          <article className="ccs-compare-case ccs-test-case ccs-case-equal">
+            <header><span>BIT ABSENT</span><strong>No overlap</strong></header>
+            <div className="ccs-bit-operation">
+              <code>value&nbsp; 1010</code>
+              <code>mask&nbsp;&nbsp; 0100</code>
+              <code>AND&nbsp;&nbsp;&nbsp; 0000</code>
+            </div>
+            <div className="ccs-equation">0000 is zero</div>
+            <div className="ccs-flag-result"><span>Z</span><strong>1</strong><em>selected bit not found</em></div>
+            <small>X0 and X1 stay unchanged</small>
+          </article>
         </div>
-        <code className="ccs-instruction">cmp x0, x1</code>
-        <div className="ccs-equation">5 − 7 ≠ 0</div>
-        <div className="ccs-flag-result"><span>Z</span><strong>0</strong><em>not equal</em></div>
-        <small>X0 and X1 stay unchanged</small>
       </section>
     </div>
   );
@@ -310,7 +361,12 @@ function StackFrameFlowScene() {
         <header><span>2</span><strong>Body · work</strong></header>
         <ol><li><code>mov x0, 42</code><small>X0 = result</small></li></ol>
         <div className="ccs-mini-frame">
-          <span>DFF8 · saved return-to-caller address</span><span>DFF0 · saved incoming FP ← SP, live FP</span>
+          <span>memory[DFF8] contains the return-to-caller address</span>
+          <span>memory[DFF0] contains the caller’s old X29</span>
+        </div>
+        <div className="ccs-live-frame-pointers">
+          <code>SP = DFF0</code>
+          <code>live X29 = DFF0 → points here</code>
         </div>
       </section>
       <FlowArrow />
